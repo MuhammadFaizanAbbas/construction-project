@@ -3,9 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>CEJ Construction - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Welcome to Job Management</h1>
+    <div class="app-shell">
+        <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar__header">
+                <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Close navigation menu">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 6l12 12"></path>
+                        <path d="M18 6L6 18"></path>
+                    </svg>
+                </button>
+                <div class="brand">
+                    <div class="brand__logo" aria-hidden="true">
+                        <svg viewBox="0 0 48 48" class="brand__logo-svg">
+                            <rect x="4" y="26" width="10" height="14" rx="1" stroke="white" stroke-width="2.5" fill="none"></rect>
+                            <rect x="18" y="18" width="10" height="22" rx="1" stroke="white" stroke-width="2.5" fill="none"></rect>
+                            <rect x="32" y="10" width="12" height="30" rx="1" stroke="white" stroke-width="2.5" fill="none"></rect>
+                            <path d="M6 20L18 14L30 19L42 8" stroke="white" stroke-width="3" fill="none"></path>
+                        </svg>
+                    </div>
+                    <div class="brand__text">
+                        <h1>CEJ Construction</h1>
+                        <p>Miles Jackson - admin</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar__nav" id="sidebarNav" aria-label="Primary"></nav>
+
+            <div class="sidebar__footer">
+                <div class="profile-card">
+                    <div class="profile-card__avatar">MJ</div>
+                    <div class="profile-card__info">
+                        <strong>Miles Jackson</strong>
+                        <span>miles.jackson@cej.com</span>
+                    </div>
+                </div>
+                <button class="logout-button" type="button">
+                    <span class="menu-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <path d="M16 17l5-5-5-5"></path>
+                            <path d="M21 12H9"></path>
+                        </svg>
+                    </span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="main content-area">
+            <header class="topbar content-header" id="appHeader">
+                <div class="page-title" id="contentHeaderTitle">Dashboard</div>
+                <div class="topbar-right header-actions" id="topbarActions">
+                    <button class="notification-button" id="notificationToggle" type="button" aria-label="Show notifications" aria-expanded="false">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+                                <path d="M10 21a2 2 0 0 0 4 0"></path>
+                            </svg>
+                        </span>
+                        <span class="notification-button__badge">3</span>
+                    </button>
+                    <button class="menu-toggle" id="sidebarToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="sidebar">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="4" y1="7" x2="20" y2="7"></line>
+                            <line x1="4" y1="12" x2="20" y2="12"></line>
+                            <line x1="4" y1="17" x2="20" y2="17"></line>
+                        </svg>
+                    </button>
+                    <div class="notification-card" id="notificationCard" hidden>
+                        <div class="notification-card__header">
+                            <strong>Notifications</strong>
+                            <span>3 new</span>
+                        </div>
+                        <div class="notification-list" id="notificationList"></div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="content page-content" id="content">
+                <div class="page active page-layout" id="pageContent"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/sidebar.js"></script>
+    <script src="js/pages/dashboard.js"></script>
+    <script src="js/pages/schedule.js"></script>
+    <script src="js/pages/scope.js"></script>
+    <script src="js/pages/team.js"></script>
+    <script src="js/pages/finance.js"></script>
+    <script src="js/pages/notifications.js"></script>
+    <script src="js/pages/clients.js"></script>
+    <script src="js/pages/forms.js"></script>
+    <script src="js/pages/archive.js"></script>
+    <script src="js/pages/reporting.js"></script>
+    <script src="js/pages/messages.js"></script>
+    <script src="js/pages/access.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
