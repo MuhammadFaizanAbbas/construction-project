@@ -59,6 +59,12 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, pageId);
     }
 
+    function navigateToPage(pageId) {
+        setActivePage(pageId);
+        window.renderSidebar(activePage);
+        renderPage(activePage);
+    }
+
     function renderNotifications() {
         if (!notificationList) {
             return;
@@ -131,6 +137,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.__jobManagementRenderActivePage = () => renderPage(activePage);
+    window.__jobManagementNavigateToPage = navigateToPage;
 
     if (!window.sidebarItems?.some((item) => item.id === activePage)) {
         setActivePage("dashboard");
@@ -149,8 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         setActivePage(button.dataset.page);
-        window.renderSidebar(activePage);
-        renderPage(activePage);
+        navigateToPage(button.dataset.page);
 
         if (isMobileSidebarMode()) {
             setSidebarOpen(false);

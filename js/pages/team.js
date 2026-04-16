@@ -80,6 +80,14 @@ window.pageModules.team = (() => {
         return `team-pill team-pill--status team-pill--${String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
     }
 
+    function openScopeJob(address) {
+        if (typeof window.__jobManagementNavigateToPage === "function") {
+            window.__jobManagementNavigateToPage("scope");
+        }
+
+        return window.pageModules?.scope?.openJobByAddress?.(address) || false;
+    }
+
     function renderMemberCard(member, escapeHtml) {
         return `
             <article class="team-member">
@@ -106,7 +114,7 @@ window.pageModules.team = (() => {
                     </div>
                     <div class="team-table__body">
                         ${member.jobs.map((job) => `
-                            <div class="team-row">
+                            <div class="team-row team-row--interactive" data-scope-address="${escapeHtml(job.address)}">
                                 <div class="team-row__address">${escapeHtml(job.address)}</div>
                                 <div><span class="${getTypeClass(job.type)}">${escapeHtml(job.type)}</span></div>
                                 <div><span class="${getStatusClass(job.status)}">${escapeHtml(job.status)}</span></div>
@@ -255,6 +263,17 @@ window.pageModules.team = (() => {
                 border-bottom: 1px solid #f1f4fa;
             }
 
+            .team-row--interactive {
+                cursor: pointer;
+                transition: background-color 0.2s ease, transform 0.2s ease;
+            }
+
+            .team-row--interactive:hover,
+            .team-row--interactive:focus-visible {
+                background: #f8fbff;
+                outline: none;
+            }
+
             .team-row:last-child {
                 border-bottom: none;
             }
@@ -359,6 +378,17 @@ window.pageModules.team = (() => {
                 <h2 class="team-page__title">Team Overview</h2>
                 ${teamMembers.map((member) => renderMemberCard(member, escapeHtml)).join("")}
             </section>
-        `
+        `,
+        onClick: (event) => {
+            const clickTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+            const row = clickTarget?.closest("[data-scope-address]");
+
+            if (!row) {
+                return false;
+            }
+
+            return openScopeJob(row.getAttribute("data-scope-address"));
+        },
+        openScopeJob
     };
 })();
