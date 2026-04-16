@@ -134,6 +134,7 @@ window.pageModules.team = (() => {
             .team-page {
                 display: grid;
                 gap: 18px;
+                padding-top: 30px;
             }
 
             .team-page__title {

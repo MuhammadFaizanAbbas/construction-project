@@ -13,6 +13,8 @@ window.pageModules.finance = (() => {
     ];
 
     const state = {
+        currentPage: 1,
+        rowsPerPage: 20,
         exportModal: {
             isOpen: false,
             fromDate: "2025-03-31",
@@ -29,6 +31,23 @@ window.pageModules.finance = (() => {
 
     function getStatusClass(status) {
         return `finance-pill finance-pill--${String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    }
+
+    function getPagination() {
+        const totalRows = financeRows.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / state.rowsPerPage));
+        const currentPage = Math.min(state.currentPage, totalPages);
+        const startIndex = (currentPage - 1) * state.rowsPerPage;
+        const endIndex = startIndex + state.rowsPerPage;
+
+        return {
+            totalRows,
+            totalPages,
+            currentPage,
+            startIndex,
+            endIndex,
+            rows: financeRows.slice(startIndex, endIndex)
+        };
     }
 
     function rerenderFinancePage() {
@@ -151,7 +170,7 @@ window.pageModules.finance = (() => {
         title: "Finance",
         search: "Search finance...",
         style: `
-            .finance-shell { display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
+            .finance-shell { display: flex; flex-direction: column; gap: 20px; padding-top: 30px; }
             .finance-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
             .finance-topbar h2 { margin: 0; color: #101b2d; font-size: 1.1rem; font-weight: 800; }
             .finance-export { border: 1px solid #9fddd0; background: #e8faf5; color: #0b7157; border-radius: 12px; padding: 10px 16px; font: inherit; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
@@ -172,11 +191,14 @@ window.pageModules.finance = (() => {
             .finance-kpi strong.finance-kpi__violet { color: #5342c6; }
             .finance-kpi strong.finance-kpi__amber { color: #a85f00; }
             .finance-table-card { background: #fff; border: 1px solid #dde5f0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 22px rgba(24, 36, 61, 0.04); }
-            .finance-table-wrap { overflow-x: auto; }
-            .finance-table { width: 100%; border-collapse: collapse; min-width: 1160px; }
+            .finance-table-wrap { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; border-radius: 16px; }
+            .finance-table-wrap::-webkit-scrollbar { height: 10px; }
+            .finance-table-wrap::-webkit-scrollbar-track { background: #eef2f7; border-radius: 999px; }
+            .finance-table-wrap::-webkit-scrollbar-thumb { background: #c8d4e3; border-radius: 999px; }
+            .finance-table { width: max(100%, 1400px); border-collapse: collapse; }
             .finance-table th, .finance-table td { padding: 12px 12px; border-bottom: 1px solid #edf1f6; text-align: left; vertical-align: middle; }
             .finance-table tbody tr:last-child td { border-bottom: none; }
-            .finance-table th { color: #667487; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: #fff; }
+            .finance-table th { color: #667487; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: #fff; white-space: nowrap; }
             .finance-table td { color: #13243d; font-size: 0.82rem; }
             .finance-table__money { font-weight: 700; }
             .finance-table__muted { color: #8a97aa; }
@@ -189,12 +211,18 @@ window.pageModules.finance = (() => {
             .finance-pill--billed { background: #ece8ff; color: #6553cc; }
             .finance-pill--pending { background: #edf4ff; color: #2c68b4; }
             .finance-pill--signed { background: #edf8dd; color: #5b8314; }
-            .finance-tabs { display: flex; align-items: center; gap: 10px; }
-            .finance-tab { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 3px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
-            .finance-tab--works { background: #ebf7d5; color: #537e16; }
-            .finance-tab--job { background: #e4f0ff; color: #2c68b4; }
-            .finance-tab--materials { color: #9b6a08; }
+            .finance-table__head-pill { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 3px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+            .finance-table__head-pill--works { background: #ebf7d5; color: #537e16; }
+            .finance-table__head-pill--job { background: #e4f0ff; color: #2c68b4; }
+            .finance-table__head-pill--materials { color: #9b6a08; }
             .finance-table td.finance-table__materials { color: #9aa5b5; text-align: center; }
+            .finance-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; background: transparent; flex-wrap: wrap; }
+            .finance-pagination__meta { color: #6f7d90; font-size: 0.8rem; }
+            .finance-pagination__controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+            .finance-pagination__button { border: 1px solid #cfd8e4; background: #fff; color: #28415f; border-radius: 10px; padding: 8px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
+            .finance-pagination__button[disabled] { opacity: 0.5; cursor: not-allowed; }
+            .finance-pagination__page { color: #475569; font-size: 0.8rem; font-weight: 700; padding: 0 4px; }
+            .finance-table-section { display: flex; flex-direction: column; gap: 12px; }
             .finance-modal-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(18, 26, 38, 0.45); z-index: 95; }
             .finance-export-modal { width: min(100%, 520px); background: #fff; border: 1px solid #dbe4ee; border-radius: 20px; padding: 22px 24px; box-shadow: 0 18px 36px rgba(24, 36, 61, 0.18); }
             .finance-export-modal__header h3 { margin: 0 0 16px; color: #20242b; font-size: 1.35rem; font-weight: 800; }
@@ -219,6 +247,9 @@ window.pageModules.finance = (() => {
             }
         `,
         render: () => `
+            ${(() => {
+                const pagination = getPagination();
+                return `
             <section class="finance-shell">
                 <div class="finance-topbar">
                     <h2>Finance</h2>
@@ -257,44 +288,58 @@ window.pageModules.finance = (() => {
                     </article>
                 </div>
 
-                <section class="finance-table-card">
-                    <div class="finance-table-wrap">
-                        <table class="finance-table">
-                            <thead>
-                                <tr>
-                                    <th>Address</th>
-                                    <th>Client</th>
-                                    <th>Contractor</th>
-                                    <th>Status</th>
-                                    <th><span class="finance-tab finance-tab--works">Works Value</span></th>
-                                    <th><span class="finance-tab finance-tab--job">Job Price</span></th>
-                                    <th><span class="finance-tab finance-tab--materials">Materials</span></th>
-                                    <th>Net Works</th>
-                                    <th>Net Job Price</th>
-                                    <th>Billed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${financeRows.map((row) => `
+                <section class="finance-table-section">
+                    <div class="finance-table-card">
+                        <div class="finance-table-wrap">
+                            <table class="finance-table">
+                                <thead>
                                     <tr>
-                                        <td>${row.address}</td>
-                                        <td>${row.client}</td>
-                                        <td>${row.contractor}</td>
-                                        <td><span class="${getStatusClass(row.status)}">${row.status === "Needs Snagging" ? "⚠ Needs Snagging" : row.status}</span></td>
-                                        <td class="finance-table__money">${formatCurrency(row.worksValue)}</td>
-                                        <td>${formatCurrency(row.jobPrice)}</td>
-                                        <td class="finance-table__materials">—</td>
-                                        <td class="finance-table__muted">${formatCurrency(row.worksValue - row.materials)}</td>
-                                        <td class="finance-table__muted">${formatCurrency(row.jobPrice - row.materials)}</td>
-                                        <td><span class="${getStatusClass(row.billed)}">${row.billed === "Signed" ? "✓ Signed" : row.billed}</span></td>
+                                        <th>Address</th>
+                                        <th>Client</th>
+                                        <th>Contractor</th>
+                                        <th>Status</th>
+                                    <th><span class="finance-table__head-pill finance-table__head-pill--works">Works Value</span></th>
+                                    <th><span class="finance-table__head-pill finance-table__head-pill--job">Job Price</span></th>
+                                    <th><span class="finance-table__head-pill finance-table__head-pill--materials">Materials</span></th>
+                                        <th>Net Works</th>
+                                        <th>Net Job Price</th>
+                                        <th>Billed</th>
                                     </tr>
-                                `).join("")}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    ${pagination.rows.map((row) => `
+                                        <tr>
+                                            <td>${row.address}</td>
+                                            <td>${row.client}</td>
+                                            <td>${row.contractor}</td>
+                                            <td><span class="${getStatusClass(row.status)}">${row.status === "Needs Snagging" ? "⚠ Needs Snagging" : row.status}</span></td>
+                                            <td class="finance-table__money">${formatCurrency(row.worksValue)}</td>
+                                            <td>${formatCurrency(row.jobPrice)}</td>
+                                            <td class="finance-table__materials">—</td>
+                                            <td class="finance-table__muted">${formatCurrency(row.worksValue - row.materials)}</td>
+                                            <td class="finance-table__muted">${formatCurrency(row.jobPrice - row.materials)}</td>
+                                            <td><span class="${getStatusClass(row.billed)}">${row.billed === "Signed" ? "✓ Signed" : row.billed}</span></td>
+                                        </tr>
+                                    `).join("")}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="finance-pagination">
+                        <div class="finance-pagination__meta">
+                            Showing ${pagination.totalRows ? pagination.startIndex + 1 : 0}-${Math.min(pagination.endIndex, pagination.totalRows)} of ${pagination.totalRows}
+                        </div>
+                        <div class="finance-pagination__controls">
+                            <button class="finance-pagination__button" type="button" data-finance-page="prev" ${pagination.currentPage <= 1 ? "disabled" : ""}>Previous</button>
+                            <span class="finance-pagination__page">Page ${pagination.currentPage} of ${pagination.totalPages}</span>
+                            <button class="finance-pagination__button" type="button" data-finance-page="next" ${pagination.currentPage >= pagination.totalPages ? "disabled" : ""}>Next</button>
+                        </div>
                     </div>
                 </section>
                 ${renderExportModal()}
             </section>
+        `;
+            })()}
         `,
         onClick: (event, { rerender }) => {
             const clickTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
@@ -306,6 +351,7 @@ window.pageModules.finance = (() => {
             const closeExportModalButton = clickTarget.closest("[data-close-export-modal]");
             const exportModalBackdrop = clickTarget.closest("[data-close-export-modal-backdrop]");
             const downloadExportButton = clickTarget.closest("[data-download-export-csv]");
+            const financePageButton = clickTarget.closest("[data-finance-page]");
 
             if (openExportModalButton) {
                 state.exportModal.isOpen = true;
@@ -322,6 +368,19 @@ window.pageModules.finance = (() => {
             if (downloadExportButton) {
                 downloadCsvFile();
                 state.exportModal.isOpen = false;
+                rerender();
+                return true;
+            }
+
+            if (financePageButton) {
+                const direction = financePageButton.getAttribute("data-finance-page");
+                const { totalPages } = getPagination();
+                if (direction === "prev" && state.currentPage > 1) {
+                    state.currentPage -= 1;
+                }
+                if (direction === "next" && state.currentPage < totalPages) {
+                    state.currentPage += 1;
+                }
                 rerender();
                 return true;
             }

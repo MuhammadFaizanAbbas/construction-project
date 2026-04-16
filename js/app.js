@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const notificationToggle = document.getElementById("notificationToggle");
     const notificationCard = document.getElementById("notificationCard");
     const notificationList = document.getElementById("notificationList");
+    const notificationBadge = document.getElementById("notificationBadge");
+    const notificationMarkAll = document.getElementById("notificationMarkAll");
     const sidebar = document.getElementById("sidebar");
     const sidebarToggle = document.getElementById("sidebarToggle");
     const sidebarClose = document.getElementById("sidebarClose");
@@ -15,19 +17,32 @@ document.addEventListener("DOMContentLoaded", () => {
     let activePage = localStorage.getItem(ACTIVE_PAGE_STORAGE_KEY) || "dashboard";
     const notifications = [
         {
-            title: "New invoice received",
-            message: "Finance team uploaded invoice INV-203 for review.",
-            time: "5 min ago"
+            title: "Complete but not billed",
+            message: "42 Dorac Avenue SK8 3NZ",
+            time: "5 min ago",
+            tone: "amber",
+            isRead: false
         },
         {
-            title: "Site meeting reminder",
-            message: "Project coordination meeting starts at 3:00 PM today.",
-            time: "20 min ago"
+            title: "No operative assigned",
+            message: "33 Oak Lane WA15 9GH",
+            time: "20 min ago",
+            tone: "blue",
+            isRead: false
         },
         {
-            title: "Task completed",
-            message: "Foundation checklist has been marked complete.",
-            time: "1 hour ago"
+            title: "Snagging required",
+            message: "22 Birch Grove WA16 7QT — Plaster finish to hallway walls not to required standard. Sk...",
+            time: "1 hour ago",
+            tone: "red",
+            isRead: false
+        },
+        {
+            title: "Job not issued to a contractor",
+            message: "62 Sycamore Drive WA14 2BV",
+            time: "2 hours ago",
+            tone: "red",
+            isRead: false
         }
     ];
 
@@ -70,13 +85,23 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const unreadCount = notifications.filter((item) => !item.isRead).length;
+
+        if (notificationBadge) {
+            notificationBadge.textContent = String(unreadCount);
+            notificationBadge.hidden = unreadCount === 0;
+        }
+
+        if (notificationMarkAll) {
+            notificationMarkAll.hidden = unreadCount === 0;
+        }
+
         notificationList.innerHTML = notifications.map((item) => `
-            <article class="notification-item">
-                <div class="notification-item__dot"></div>
+            <article class="notification-item ${item.isRead ? "is-read" : ""}">
+                <div class="notification-item__dot notification-item__dot--${escapeHtml(item.tone || "blue")}"></div>
                 <div class="notification-item__content">
                     <h3>${escapeHtml(item.title)}</h3>
                     <p>${escapeHtml(item.message)}</p>
-                    <span>${escapeHtml(item.time)}</span>
                 </div>
             </article>
         `).join("");
@@ -193,6 +218,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     notificationCard?.addEventListener("click", (event) => {
         event.stopPropagation();
+    });
+
+    notificationMarkAll?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        notifications.forEach((item) => {
+            item.isRead = true;
+        });
+        renderNotifications();
     });
 
     document.addEventListener("click", () => {

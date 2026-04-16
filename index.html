@@ -67,7 +67,7 @@
                                 <path d="M10 21a2 2 0 0 0 4 0"></path>
                             </svg>
                         </span>
-                        <span class="notification-button__badge">3</span>
+                        <span class="notification-button__badge" id="notificationBadge">3</span>
                     </button>
                     <button class="menu-toggle" id="sidebarToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="sidebar">
                         <svg viewBox="0 0 24 24">
@@ -79,7 +79,7 @@
                     <div class="notification-card" id="notificationCard" hidden>
                         <div class="notification-card__header">
                             <strong>Notifications</strong>
-                            <span>3 new</span>
+                            <button class="notification-card__mark-all" id="notificationMarkAll" type="button">Mark all read</button>
                         </div>
                         <div class="notification-list" id="notificationList"></div>
                     </div>

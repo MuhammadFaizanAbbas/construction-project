@@ -591,11 +591,18 @@ window.pageModules.dashboard = (() => {
                 border-radius: 16px;
                 min-height: 86px;
                 box-shadow: 0 8px 22px rgba(24, 36, 61, 0.04);
+                transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
             }
 
             .dashboard-stat-card.is-accent {
                 background: #fff8ed;
                 border-color: #f1d2a0;
+            }
+
+            .dashboard-stat-card:hover {
+                transform: translateY(-3px);
+                border-color: #cfdbe8;
+                box-shadow: 0 18px 32px rgba(24, 36, 61, 0.09);
             }
 
             .dashboard-stat-card p {
