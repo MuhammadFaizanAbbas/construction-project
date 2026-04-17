@@ -375,10 +375,17 @@ window.pageModules.signup = (() => {
                 email: state.email.trim(),
                 password: state.password,
                 role: state.role
-            }).then(() => {
+            }).then((result) => {
                 state.isSubmitting = false;
                 state.errors = {};
                 state.password = "";
+
+                if (result?.requiresEmailConfirmation) {
+                    window.__jobManagementShowToast?.("Account created. Please verify your email before logging in.", "success");
+                    window.__jobManagementNavigateToPage?.("login");
+                    return;
+                }
+
                 window.__jobManagementShowToast?.("Account created successfully.", "success");
                 window.__jobManagementNavigateToPage?.("dashboard");
             }).catch((error) => {

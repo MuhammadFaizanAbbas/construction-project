@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const API_BASE_URL = window.location.port === "5501"
         ? "http://127.0.0.1:8000"
         : "";
+    const SUPABASE_AUTH_CONFIG = window.__SUPABASE_AUTH_CONFIG__ || {};
     const toastStack = document.getElementById("toastStack");
     let pageStyleTag = document.getElementById("pageStyleTag");
     let activePage = "login";
@@ -132,7 +133,108 @@ document.addEventListener("DOMContentLoaded", () => {
         updateSidebarUser(null);
     }
 
+    function getSupabaseConfig() {
+        const url = String(SUPABASE_AUTH_CONFIG.url || "").trim().replace(/\/+$/, "");
+        const publishableKey = String(
+            SUPABASE_AUTH_CONFIG.publishableKey
+            || SUPABASE_AUTH_CONFIG.anonKey
+            || ""
+        ).trim();
+
+        return {
+            url,
+            publishableKey
+        };
+    }
+
+    function hasSupabaseAuthConfig() {
+        const { url, publishableKey } = getSupabaseConfig();
+        return Boolean(url && publishableKey);
+    }
+
+    function createAppUserFromSupabase(user) {
+        const metadata = user?.user_metadata || {};
+        const appMetadata = user?.app_metadata || {};
+        const email = user?.email || "";
+        const fallbackName = email ? email.split("@")[0] : "User";
+
+        return {
+            id: user?.id || "",
+            email: email || "Not signed in",
+            name: metadata.name || metadata.full_name || appMetadata.name || fallbackName,
+            role: metadata.role || appMetadata.role || "Team Member"
+        };
+    }
+
+    async function postSupabaseAuth(path, payload) {
+        const { url, publishableKey } = getSupabaseConfig();
+
+        if (!url || !publishableKey) {
+            throw new Error("Supabase auth is not configured. Add your project URL and publishable/anon key to window.__SUPABASE_AUTH_CONFIG__.");
+        }
+
+        const response = await fetch(`${url}${path}`, {
+            method: "POST",
+            headers: {
+                "apikey": publishableKey,
+                "Authorization": `Bearer ${publishableKey}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            const message = result.msg || result.error_description || result.error || "Request failed.";
+            throw new Error(message);
+        }
+
+        return result;
+    }
+
+    async function signInWithSupabase(payload) {
+        const result = await postSupabaseAuth("/auth/v1/token?grant_type=password", {
+            email: payload.email,
+            password: payload.password
+        });
+
+        const appUser = createAppUserFromSupabase(result.user);
+        setStoredSession(appUser);
+        return {
+            user: appUser,
+            session: result
+        };
+    }
+
+    async function signUpWithSupabase(payload) {
+        const result = await postSupabaseAuth("/auth/v1/signup", {
+            email: payload.email,
+            password: payload.password,
+            data: {
+                name: payload.name,
+                role: payload.role
+            }
+        });
+
+        const appUser = result.user ? createAppUserFromSupabase(result.user) : null;
+        const hasSession = Boolean(result.access_token || result.session);
+
+        if (appUser && hasSession) {
+            setStoredSession(appUser);
+        }
+
+        return {
+            user: appUser,
+            requiresEmailConfirmation: !hasSession
+        };
+    }
+
     async function postJson(url, payload) {
+        if (!API_BASE_URL) {
+            throw new Error("No API backend is configured for auth.");
+        }
+
         const requestUrl = API_BASE_URL ? `${API_BASE_URL}${url}` : url;
         const response = await fetch(requestUrl, {
             method: "POST",
@@ -355,14 +457,31 @@ document.addEventListener("DOMContentLoaded", () => {
     window.__jobManagementShowToast = showToast;
     window.__jobManagementAuth = {
         login: async (payload) => {
-            const result = await postJson("/api/login", payload);
-            setStoredSession(result.user);
-            return result.user;
+            if (hasSupabaseAuthConfig()) {
+                const result = await signInWithSupabase(payload);
+                return result.user;
+            }
+
+            if (API_BASE_URL) {
+                const result = await postJson("/api/login", payload);
+                setStoredSession(result.user);
+                return result.user;
+            }
+
+            throw new Error("Supabase auth is not configured. Add your project URL and anon/publishable key to js/supabase-config.js.");
         },
         signup: async (payload) => {
-            const result = await postJson("/api/signup", payload);
-            setStoredSession(result.user);
-            return result.user;
+            if (hasSupabaseAuthConfig()) {
+                return signUpWithSupabase(payload);
+            }
+
+            if (API_BASE_URL) {
+                const result = await postJson("/api/signup", payload);
+                setStoredSession(result.user);
+                return { user: result.user, requiresEmailConfirmation: false };
+            }
+
+            throw new Error("Supabase auth is not configured. Add your project URL and anon/publishable key to js/supabase-config.js.");
         },
         logout: () => {
             clearStoredSession();
