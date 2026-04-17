@@ -1,20 +1,34 @@
 document.addEventListener("DOMContentLoaded", () => {
     const pageContent = document.getElementById("pageContent");
     const contentHeaderTitle = document.getElementById("contentHeaderTitle");
+    const appHeader = document.getElementById("appHeader");
+    const sidebarBrandMeta = document.getElementById("sidebarBrandMeta");
+    const sidebarProfileAvatar = document.getElementById("sidebarProfileAvatar");
+    const sidebarProfileName = document.getElementById("sidebarProfileName");
+    const sidebarProfileEmail = document.getElementById("sidebarProfileEmail");
     const searchInput = document.querySelector("#globalSearch, .search-box input");
     const notificationToggle = document.getElementById("notificationToggle");
     const notificationCard = document.getElementById("notificationCard");
     const notificationList = document.getElementById("notificationList");
     const notificationBadge = document.getElementById("notificationBadge");
     const notificationMarkAll = document.getElementById("notificationMarkAll");
+    const newJobButton = document.getElementById("newJobButton");
+    const logoutButton = document.getElementById("logoutButton");
     const sidebar = document.getElementById("sidebar");
     const sidebarToggle = document.getElementById("sidebarToggle");
     const sidebarClose = document.getElementById("sidebarClose");
     const sidebarBackdrop = document.getElementById("sidebarBackdrop");
     const appShell = document.querySelector(".app-shell");
     const ACTIVE_PAGE_STORAGE_KEY = "job-management-active-page";
+    const AUTH_SESSION_STORAGE_KEY = "job-management-auth-session";
+    const USE_HASH_ROUTING = window.location.port === "5501";
+    const API_BASE_URL = window.location.port === "5501"
+        ? "http://127.0.0.1:8000"
+        : "";
+    const toastStack = document.getElementById("toastStack");
     let pageStyleTag = document.getElementById("pageStyleTag");
-    let activePage = localStorage.getItem(ACTIVE_PAGE_STORAGE_KEY) || "dashboard";
+    let activePage = "login";
+    const AUTH_PAGES = new Set(["login", "signup"]);
     const notifications = [
         {
             title: "Complete but not billed",
@@ -55,6 +69,87 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/'/g, "&#39;");
     }
 
+    function showToast(message, type = "success") {
+        if (!toastStack) {
+            return;
+        }
+
+        const toast = document.createElement("div");
+        toast.className = `toast toast--${type}`;
+        toast.textContent = message;
+        toastStack.appendChild(toast);
+
+        window.setTimeout(() => {
+            toast.remove();
+        }, 3200);
+    }
+
+    function getStoredSession() {
+        try {
+            const rawValue = localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+            return rawValue ? JSON.parse(rawValue) : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function updateSidebarUser(user) {
+        const fallbackName = user?.name || "Guest User";
+        const fallbackEmail = user?.email || "Not signed in";
+        const fallbackRole = user?.role || "Signed out";
+        const initials = fallbackName
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase() || "")
+            .join("") || "GU";
+
+        if (sidebarProfileAvatar) {
+            sidebarProfileAvatar.textContent = initials;
+        }
+
+        if (sidebarProfileName) {
+            sidebarProfileName.textContent = fallbackName;
+        }
+
+        if (sidebarProfileEmail) {
+            sidebarProfileEmail.textContent = fallbackEmail;
+        }
+
+        if (sidebarBrandMeta) {
+            sidebarBrandMeta.textContent = user ? `${fallbackEmail} | ${fallbackRole}` : "Signed out";
+        }
+    }
+
+    function setStoredSession(user) {
+        localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(user));
+        updateSidebarUser(user);
+    }
+
+    function clearStoredSession() {
+        localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+        localStorage.removeItem(ACTIVE_PAGE_STORAGE_KEY);
+        updateSidebarUser(null);
+    }
+
+    async function postJson(url, payload) {
+        const requestUrl = API_BASE_URL ? `${API_BASE_URL}${url}` : url;
+        const response = await fetch(requestUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(result.error || "Request failed.");
+        }
+
+        return result;
+    }
+
     function applyPageStyle(cssText) {
         if (!pageStyleTag) {
             pageStyleTag = document.createElement("style");
@@ -66,7 +161,95 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getPage(pageId) {
-        return window.pageModules?.[pageId] || window.pageModules?.dashboard;
+        return window.pageModules?.[pageId] || window.pageModules?.login || window.pageModules?.dashboard;
+    }
+
+    function getPathForPage(pageId) {
+        if (USE_HASH_ROUTING) {
+            return `/#${pageId}`;
+        }
+        return `/${pageId}`;
+    }
+
+    function getPageIdFromLocation() {
+        const knownPages = new Set([
+            "login",
+            "signup",
+            ...(window.sidebarItems || []).map((item) => item.id)
+        ]);
+        const hashPageId = String(window.location.hash || "").replace(/^#\/?/, "").trim();
+        if (hashPageId && knownPages.has(hashPageId)) {
+            return hashPageId;
+        }
+
+        const pathname = window.location.pathname;
+        const normalizedPath = String(pathname || "/").replace(/\/+$/, "") || "/";
+
+        if (normalizedPath === "/") {
+            return "login";
+        }
+
+        const pageId = normalizedPath.replace(/^\//, "");
+        return knownPages.has(pageId) ? pageId : "login";
+    }
+
+    function syncUrlWithPage(pageId, replace = false) {
+        const statePayload = { pageId };
+        const nextPath = getPathForPage(pageId);
+
+        if (USE_HASH_ROUTING) {
+            if (`/${window.location.hash}` === nextPath || window.location.hash === `#${pageId}`) {
+                return;
+            }
+
+            if (replace) {
+                window.history.replaceState(statePayload, "", nextPath);
+            } else {
+                window.history.pushState(statePayload, "", nextPath);
+            }
+            return;
+        }
+
+        if (window.location.pathname === nextPath) {
+            return;
+        }
+
+        if (replace) {
+            window.history.replaceState(statePayload, "", nextPath);
+        } else {
+            window.history.pushState(statePayload, "", nextPath);
+        }
+    }
+
+    function updateLayoutForPage(pageId) {
+        const isAuthPage = AUTH_PAGES.has(pageId);
+
+        if (appShell) {
+            appShell.classList.toggle("app-shell--auth", isAuthPage);
+        }
+
+        if (sidebar) {
+            sidebar.hidden = isAuthPage;
+        }
+
+        if (appHeader) {
+            appHeader.hidden = isAuthPage;
+        }
+
+        if (sidebarBackdrop) {
+            sidebarBackdrop.hidden = true;
+        }
+
+        if (!isAuthPage) {
+            return;
+        }
+
+        setSidebarOpen(false);
+        setNotificationOpen(false);
+    }
+
+    function hasAuthenticatedSession() {
+        return Boolean(getStoredSession());
     }
 
     function setActivePage(pageId) {
@@ -74,9 +257,13 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, pageId);
     }
 
-    function navigateToPage(pageId) {
+    function navigateToPage(pageId, options = {}) {
+        const { replace = false } = options;
         setActivePage(pageId);
-        window.renderSidebar(activePage);
+        syncUrlWithPage(activePage, replace);
+        if (!AUTH_PAGES.has(activePage)) {
+            window.renderSidebar(activePage);
+        }
         renderPage(activePage);
     }
 
@@ -138,6 +325,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        updateLayoutForPage(pageId);
+
         if (contentHeaderTitle) {
             contentHeaderTitle.textContent = page.title;
         }
@@ -163,13 +352,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.__jobManagementRenderActivePage = () => renderPage(activePage);
     window.__jobManagementNavigateToPage = navigateToPage;
+    window.__jobManagementShowToast = showToast;
+    window.__jobManagementAuth = {
+        login: async (payload) => {
+            const result = await postJson("/api/login", payload);
+            setStoredSession(result.user);
+            return result.user;
+        },
+        signup: async (payload) => {
+            const result = await postJson("/api/signup", payload);
+            setStoredSession(result.user);
+            return result.user;
+        },
+        logout: () => {
+            clearStoredSession();
+        }
+    };
+    updateSidebarUser(getStoredSession());
+    activePage = getPageIdFromLocation();
 
-    if (!window.sidebarItems?.some((item) => item.id === activePage)) {
-        setActivePage("dashboard");
+    if (!hasAuthenticatedSession() && !AUTH_PAGES.has(activePage)) {
+        navigateToPage("login", { replace: true });
+    } else if (hasAuthenticatedSession() && AUTH_PAGES.has(activePage)) {
+        navigateToPage("dashboard", { replace: true });
+    } else if ((USE_HASH_ROUTING && !window.location.hash) || (!USE_HASH_ROUTING && window.location.pathname === "/")) {
+        navigateToPage("login", { replace: true });
+    } else {
+        setActivePage(activePage);
+        if (!AUTH_PAGES.has(activePage)) {
+            window.renderSidebar(activePage);
+        }
+        renderPage(activePage);
     }
-
-    window.renderSidebar(activePage);
-    renderPage(activePage);
     renderNotifications();
     setNotificationOpen(false);
 
@@ -180,7 +394,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        setActivePage(button.dataset.page);
         navigateToPage(button.dataset.page);
 
         if (isMobileSidebarMode()) {
@@ -192,10 +405,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const page = getPage(activePage);
 
         if (typeof page?.onClick === "function") {
-            page.onClick(event, {
+            const handled = page.onClick(event, {
                 escapeHtml,
                 rerender: () => renderPage(activePage)
             });
+
+            if (handled) {
+                event.preventDefault();
+            }
         }
     });
 
@@ -228,6 +445,19 @@ document.addEventListener("DOMContentLoaded", () => {
         renderNotifications();
     });
 
+    newJobButton?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        navigateToPage("dashboard");
+        if (typeof window.pageModules?.dashboard?.openCreateJob === "function") {
+            window.pageModules.dashboard.openCreateJob();
+        }
+    });
+
+    logoutButton?.addEventListener("click", () => {
+        clearStoredSession();
+        navigateToPage("login");
+    });
+
     document.addEventListener("click", () => {
         setNotificationOpen(false);
     });
@@ -257,5 +487,43 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isMobileSidebarMode()) {
             setSidebarOpen(false);
         }
+    });
+
+    window.addEventListener("popstate", () => {
+        const pageId = getPageIdFromLocation();
+        if (!hasAuthenticatedSession() && !AUTH_PAGES.has(pageId)) {
+            navigateToPage("login", { replace: true });
+            return;
+        }
+        if (hasAuthenticatedSession() && AUTH_PAGES.has(pageId)) {
+            navigateToPage("dashboard", { replace: true });
+            return;
+        }
+        setActivePage(pageId);
+        if (!AUTH_PAGES.has(pageId)) {
+            window.renderSidebar(pageId);
+        }
+        renderPage(pageId);
+    });
+
+    window.addEventListener("hashchange", () => {
+        if (!USE_HASH_ROUTING) {
+            return;
+        }
+
+        const pageId = getPageIdFromLocation();
+        if (!hasAuthenticatedSession() && !AUTH_PAGES.has(pageId)) {
+            navigateToPage("login", { replace: true });
+            return;
+        }
+        if (hasAuthenticatedSession() && AUTH_PAGES.has(pageId)) {
+            navigateToPage("dashboard", { replace: true });
+            return;
+        }
+        setActivePage(pageId);
+        if (!AUTH_PAGES.has(pageId)) {
+            window.renderSidebar(pageId);
+        }
+        renderPage(pageId);
     });
 });

@@ -34,8 +34,7 @@ window.pageModules.dashboard = (() => {
         "Billed"
     ];
     const CONTRACTOR_OPTIONS = [
-        "B&G Contractors",
-        "Contractor Review"
+        "B&G Contractors"
     ];
     const SCOPE_LOCATION_OPTIONS = [
         "BATHROOM",
@@ -79,12 +78,19 @@ window.pageModules.dashboard = (() => {
     const state = {
         filter: "all",
         currentPage: 1,
-        perPage: 5,
+        perPage: 10,
         selectedJobId: null,
+        isCreateModalOpen: false,
         editForm: null,
         isTemplateModalOpen: false,
         templateDraft: null
     };
+
+    function rerenderDashboardPage() {
+        if (typeof window.__jobManagementRenderActivePage === "function") {
+            window.__jobManagementRenderActivePage();
+        }
+    }
 
     function escapeAttribute(value) {
         return String(value)
@@ -273,6 +279,29 @@ window.pageModules.dashboard = (() => {
         };
     }
 
+    function getBlankJobFormData() {
+        return {
+            address: "",
+            client: CLIENT_OPTIONS[0],
+            customClientName: "",
+            showCustomClientInput: false,
+            jobType: jobTypeOptions[0] || "",
+            tenantName: "",
+            tenantContact: "",
+            issuedTo: "— None —",
+            assignedOperative: "Unassigned",
+            status: statusOptions[0] || "Needs Survey",
+            startDate: "",
+            endDate: "",
+            notes: "",
+            images: [],
+            scopeImport: null,
+            worksValue: "0.00",
+            jobPrice: "0.00",
+            locationRows: []
+        };
+    }
+
     function clearEditFormState() {
         if (state.editForm?.images?.length) {
             state.editForm.images.forEach((image) => {
@@ -283,6 +312,7 @@ window.pageModules.dashboard = (() => {
         }
 
         state.editForm = null;
+        state.isCreateModalOpen = false;
         state.isTemplateModalOpen = false;
         state.templateDraft = null;
     }
@@ -316,9 +346,16 @@ window.pageModules.dashboard = (() => {
     }
 
     function ensureFormState(selectedJob) {
-        if (!selectedJob) {
+        if (!selectedJob && !state.isCreateModalOpen) {
             clearEditFormState();
             return null;
+        }
+
+        if (state.isCreateModalOpen) {
+            if (!state.editForm) {
+                state.editForm = getBlankJobFormData();
+            }
+            return state.editForm;
         }
 
         if (state.selectedJobId !== selectedJob.id || !state.editForm) {
@@ -410,15 +447,18 @@ window.pageModules.dashboard = (() => {
 
     function renderModal(selectedJob) {
         const formData = ensureFormState(selectedJob);
+        const isCreateMode = state.isCreateModalOpen;
+        const modalTitle = isCreateMode ? "New job" : formData?.address;
+        const headerLabel = isCreateMode ? "Create" : "Edit";
 
         return `
-            <div class="modal-backdrop${selectedJob ? " is-visible" : ""}" ${selectedJob ? "" : "hidden"}>
-                <section class="edit-modal" role="dialog" aria-modal="true" aria-label="Edit job">
+            <div class="modal-backdrop${formData ? " is-visible" : ""}" ${formData ? "" : "hidden"}>
+                <section class="edit-modal" role="dialog" aria-modal="true" aria-label="${isCreateMode ? "Create new job" : "Edit job"}">
                     ${formData ? `
                         <div class="edit-modal__header">
                             <div>
-                                <p>Edit</p>
-                                <h3>${formData.address}</h3>
+                                <p>${headerLabel}</p>
+                                <h3>${escapeAttribute(modalTitle)}</h3>
                             </div>
                             <button class="edit-modal__close" type="button" data-close-edit>&times;</button>
                         </div>
@@ -449,10 +489,15 @@ window.pageModules.dashboard = (() => {
                                 <label><span>Job type</span><select data-edit-field="jobType">${renderOptions(jobTypeOptions, formData.jobType)}</select></label>
                                 <label><span>Tenant name</span><input type="text" value="${escapeAttribute(formData.tenantName)}" data-edit-field="tenantName"></label>
                                 <label><span>Tenant contact</span><input type="text" value="${escapeAttribute(formData.tenantContact)}" data-edit-field="tenantContact"></label>
-                                <label><span>Issued to (Contractor)</span><select data-edit-field="issuedTo">${renderOptions(CONTRACTOR_OPTIONS, formData.issuedTo)}</select></label>
+                                <label><span>Issued to (Contractor)</span><select data-edit-field="issuedTo">${renderOptions(["— None —", ...CONTRACTOR_OPTIONS], formData.issuedTo)}</select></label>
                                 <label><span>Assigned operative</span><select data-edit-field="assignedOperative">${renderOptions(ASSIGNED_OPERATIVE_OPTIONS, formData.assignedOperative)}</select></label>
                             </div>
-                            <p class="edit-modal__helper">Save the job first, then allocate to notify the contractor.</p>
+                            <p class="edit-modal__helper${formData.issuedTo && formData.issuedTo !== "— None —" ? " edit-modal__helper--success" : ""}">
+                                ${formData.issuedTo && formData.issuedTo !== "— None —"
+                                    ? `${escapeAttribute(formData.issuedTo)} will be notified when this job is saved.`
+                                    : "Save the job first, then allocate to notify the contractor."
+                                }
+                            </p>
                             <div class="edit-modal__grid">
                                 <label><span>Status</span><select data-edit-field="status">${renderOptions(statusOptions, formData.status)}</select></label>
                                 <label><span>Start date</span><input type="date" value="${escapeAttribute(formData.startDate)}" data-edit-date-field="startDate"></label>
@@ -557,7 +602,7 @@ window.pageModules.dashboard = (() => {
                                 <button class="modal-button modal-button--secondary modal-button--medium" type="button" data-close-edit>Cancel</button>
                                 <button class="modal-button modal-button--secondary modal-button--medium" type="button" data-open-template>Edit template</button>
                             </div>
-                            <button class="modal-button modal-button--primary" type="button" data-save-edit>Save Job</button>
+                            <button class="modal-button modal-button--primary" type="button" data-save-edit>${isCreateMode ? "Save job" : "Save Job"}</button>
                         </div>
                         ${renderTemplateModal()}
                     ` : ""}
@@ -961,6 +1006,11 @@ window.pageModules.dashboard = (() => {
                 margin: -4px 0 0;
                 color: #8a96ad;
                 font-size: 0.74rem;
+            }
+
+            .edit-modal__helper--success {
+                color: #13825f;
+                font-weight: 600;
             }
 
             .edit-modal__media-row,
@@ -1525,6 +1575,7 @@ window.pageModules.dashboard = (() => {
 
             if (editButton) {
                 clearEditFormState();
+                state.isCreateModalOpen = false;
                 state.selectedJobId = Number(editButton.getAttribute("data-edit-job"));
                 rerender();
                 return true;
@@ -1633,7 +1684,14 @@ window.pageModules.dashboard = (() => {
                 const jobIndex = dashboardJobs.findIndex((job) => job.id === jobId);
 
                 if (jobIndex >= 0) {
+                    const deletedJob = dashboardJobs[jobIndex];
                     dashboardJobs.splice(jobIndex, 1);
+                    if (typeof window.pageModules?.finance?.removeJobByAddress === "function") {
+                        window.pageModules.finance.removeJobByAddress(deletedJob.address);
+                    }
+                    if (typeof window.pageModules?.scope?.removeJobByAddress === "function") {
+                        window.pageModules.scope.removeJobByAddress(deletedJob.address);
+                    }
                     state.selectedJobId = null;
                     rerender();
                 }
@@ -1641,26 +1699,92 @@ window.pageModules.dashboard = (() => {
                 return true;
             }
 
-            if (event.target.hasAttribute("data-save-edit") && state.editForm && state.selectedJobId !== null) {
-                const job = dashboardJobs.find((item) => item.id === state.selectedJobId);
+            if (event.target.hasAttribute("data-save-edit") && state.editForm) {
+                const resolvedClient = state.editForm.showCustomClientInput && state.editForm.customClientName
+                    ? state.editForm.customClientName
+                    : state.editForm.client;
+                const nextPayload = {
+                    address: state.editForm.address.trim(),
+                    client: resolvedClient,
+                    tenant: state.editForm.tenantName.trim(),
+                    tenantContact: state.editForm.tenantContact.trim(),
+                    type: state.editForm.jobType,
+                    contractor: state.editForm.issuedTo,
+                    assigned: state.editForm.assignedOperative,
+                    status: state.editForm.status,
+                    start: formatDateForDisplay(state.editForm.startDate),
+                    end: formatDateForDisplay(state.editForm.endDate),
+                    notes: state.editForm.notes,
+                    pipeline: Number(state.editForm.worksValue) || 0,
+                    jobPrice: state.editForm.jobPrice,
+                    locationRows: state.editForm.locationRows.map((row) => ({ ...row })),
+                    images: state.editForm.images.map((image) => ({ ...image }))
+                };
+
+                if (!nextPayload.address) {
+                    return true;
+                }
+
+                const job = state.selectedJobId !== null
+                    ? dashboardJobs.find((item) => item.id === state.selectedJobId)
+                    : null;
+                const previousAddress = job?.address || null;
 
                 if (job) {
                     job.address = state.editForm.address;
-                    job.client = state.editForm.showCustomClientInput && state.editForm.customClientName
-                        ? state.editForm.customClientName
-                        : state.editForm.client;
-                    job.tenant = state.editForm.tenantName;
-                    job.tenantContact = state.editForm.tenantContact;
-                    job.type = state.editForm.jobType;
-                    job.contractor = state.editForm.issuedTo;
-                    job.assigned = state.editForm.assignedOperative;
-                    job.status = state.editForm.status;
-                    job.start = formatDateForDisplay(state.editForm.startDate);
-                    job.end = formatDateForDisplay(state.editForm.endDate);
-                    job.notes = state.editForm.notes;
-                    job.pipeline = Number(state.editForm.worksValue) || 0;
-                    job.jobPrice = state.editForm.jobPrice;
-                    job.locationRows = state.editForm.locationRows.map((row) => ({ ...row }));
+                    job.client = nextPayload.client;
+                    job.tenant = nextPayload.tenant;
+                    job.tenantContact = nextPayload.tenantContact;
+                    job.type = nextPayload.type;
+                    job.contractor = nextPayload.contractor;
+                    job.assigned = nextPayload.assigned;
+                    job.status = nextPayload.status;
+                    job.start = nextPayload.start;
+                    job.end = nextPayload.end;
+                    job.notes = nextPayload.notes;
+                    job.pipeline = nextPayload.pipeline;
+                    job.jobPrice = nextPayload.jobPrice;
+                    job.locationRows = nextPayload.locationRows;
+                    job.images = nextPayload.images;
+                } else {
+                    const nextId = dashboardJobs.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+                    dashboardJobs.unshift({
+                        id: nextId,
+                        address: nextPayload.address,
+                        client: nextPayload.client,
+                        tenant: nextPayload.tenant,
+                        tenantContact: nextPayload.tenantContact,
+                        type: nextPayload.type,
+                        contractor: nextPayload.contractor,
+                        assigned: nextPayload.assigned,
+                        status: nextPayload.status,
+                        start: nextPayload.start,
+                        end: nextPayload.end,
+                        notes: nextPayload.notes,
+                        pipeline: nextPayload.pipeline,
+                        jobPrice: nextPayload.jobPrice,
+                        locationRows: nextPayload.locationRows,
+                        images: nextPayload.images
+                    });
+                }
+
+                const syncJob = job || dashboardJobs[0];
+
+                if (previousAddress && previousAddress !== syncJob.address) {
+                    if (typeof window.pageModules?.finance?.removeJobByAddress === "function") {
+                        window.pageModules.finance.removeJobByAddress(previousAddress);
+                    }
+                    if (typeof window.pageModules?.scope?.removeJobByAddress === "function") {
+                        window.pageModules.scope.removeJobByAddress(previousAddress);
+                    }
+                }
+
+                if (typeof window.pageModules?.finance?.addOrUpdateJob === "function") {
+                    window.pageModules.finance.addOrUpdateJob(syncJob);
+                }
+
+                if (typeof window.pageModules?.scope?.addOrUpdateJob === "function") {
+                    window.pageModules.scope.addOrUpdateJob(syncJob);
                 }
 
                 state.selectedJobId = null;
@@ -1751,6 +1875,7 @@ window.pageModules.dashboard = (() => {
 
             if (editField && state.editForm) {
                 state.editForm[editField.getAttribute("data-edit-field")] = editField.value;
+                rerender();
                 return true;
             }
 
@@ -1777,6 +1902,14 @@ window.pageModules.dashboard = (() => {
             state.editForm.customClientName = "";
             rerender();
             return true;
+        }
+        ,
+        openCreateJob: () => {
+            clearEditFormState();
+            state.selectedJobId = null;
+            state.isCreateModalOpen = true;
+            state.editForm = getBlankJobFormData();
+            rerenderDashboardPage();
         }
     };
 })();

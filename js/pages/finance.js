@@ -50,6 +50,27 @@ window.pageModules.finance = (() => {
         };
     }
 
+    function getFinanceSummaryTotals() {
+        const worksTotal = financeRows.reduce((sum, row) => sum + row.worksValue, 0);
+        const jobTotal = financeRows.reduce((sum, row) => sum + row.jobPrice, 0);
+        const materialsTotal = financeRows.reduce((sum, row) => sum + row.materials, 0);
+        const billedSigned = financeRows
+            .filter((row) => row.billed === "Signed")
+            .reduce((sum, row) => sum + row.worksValue, 0);
+        const completeUnbilled = financeRows
+            .filter((row) => row.status === "Complete" && row.billed !== "Signed")
+            .reduce((sum, row) => sum + row.worksValue, 0);
+
+        return {
+            worksTotal,
+            jobTotal,
+            grossMargin: worksTotal - jobTotal - materialsTotal,
+            materialsTotal,
+            billedSigned,
+            completeUnbilled
+        };
+    }
+
     function rerenderFinancePage() {
         if (typeof window.__jobManagementRenderActivePage === "function") {
             window.__jobManagementRenderActivePage();
@@ -249,6 +270,7 @@ window.pageModules.finance = (() => {
         render: () => `
             ${(() => {
                 const pagination = getPagination();
+                const summaryTotals = getFinanceSummaryTotals();
                 return `
             <section class="finance-shell">
                 <div class="finance-topbar">
@@ -259,12 +281,12 @@ window.pageModules.finance = (() => {
                 <div class="finance-summary">
                     <article class="finance-summary__hero finance-summary__hero--works">
                         <span>Complete Works (Total Pipeline)</span>
-                        <strong>${formatCurrency(24500)}</strong>
+                        <strong>${formatCurrency(summaryTotals.worksTotal)}</strong>
                         <p>Full value charged to clients</p>
                     </article>
                     <article class="finance-summary__hero finance-summary__hero--job">
                         <span>Job Prices (Contractor Payouts)</span>
-                        <strong>${formatCurrency(10130)}</strong>
+                        <strong>${formatCurrency(summaryTotals.jobTotal)}</strong>
                         <p>Total paid out to contractors</p>
                     </article>
                 </div>
@@ -272,19 +294,19 @@ window.pageModules.finance = (() => {
                 <div class="finance-kpis">
                     <article class="finance-kpi">
                         <span>Gross margin</span>
-                        <strong class="finance-kpi__green">${formatCurrency(14370)}</strong>
+                        <strong class="finance-kpi__green">${formatCurrency(summaryTotals.grossMargin)}</strong>
                     </article>
                     <article class="finance-kpi">
                         <span>Materials logged</span>
-                        <strong>${formatCurrency(0)}</strong>
+                        <strong>${formatCurrency(summaryTotals.materialsTotal)}</strong>
                     </article>
                     <article class="finance-kpi">
                         <span>Billed & signed</span>
-                        <strong class="finance-kpi__violet">${formatCurrency(7600)}</strong>
+                        <strong class="finance-kpi__violet">${formatCurrency(summaryTotals.billedSigned)}</strong>
                     </article>
                     <article class="finance-kpi">
                         <span>Complete — unbilled</span>
-                        <strong class="finance-kpi__amber">${formatCurrency(3200)}</strong>
+                        <strong class="finance-kpi__amber">${formatCurrency(summaryTotals.completeUnbilled)}</strong>
                     </article>
                 </div>
 
@@ -386,6 +408,42 @@ window.pageModules.finance = (() => {
             }
 
             return false;
+        },
+        addOrUpdateJob: (job) => {
+            if (!job?.address) {
+                return false;
+            }
+
+            const nextValues = {
+                address: job.address,
+                client: job.client || "-",
+                contractor: job.contractor || "—",
+                status: job.status || "Needs Survey",
+                worksValue: Number(job.pipeline) || 0,
+                jobPrice: Number(job.jobPrice) || 0,
+                materials: 0,
+                billed: job.status === "Billed" ? "Signed" : "Pending"
+            };
+            const existingRow = financeRows.find((row) => row.address === job.address);
+
+            if (existingRow) {
+                Object.assign(existingRow, nextValues);
+            } else {
+                financeRows.unshift(nextValues);
+            }
+
+            rerenderFinancePage();
+            return true;
+        },
+        removeJobByAddress: (address) => {
+            const rowIndex = financeRows.findIndex((row) => row.address === address);
+            if (rowIndex === -1) {
+                return false;
+            }
+
+            financeRows.splice(rowIndex, 1);
+            rerenderFinancePage();
+            return true;
         },
         onChange: (event) => {
             const fromDateInput = event.target.closest("[data-export-from-date]");

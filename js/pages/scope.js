@@ -823,6 +823,49 @@ window.pageModules.scope = (() => {
             const selectedJob = getSelectedJob();
             return `${renderListView()}${renderDetailView(selectedJob)}`;
         },
+        findJobByAddress,
+        addOrUpdateJob: (job) => {
+            if (!job?.address) {
+                return false;
+            }
+
+            const existingJob = findJobByAddress(job.address);
+            const nextValues = {
+                address: job.address,
+                client: job.client || "-",
+                tenant: job.tenant || "-",
+                type: job.type || "Disrepair",
+                contractor: job.contractor === "— None —" ? "-" : (job.contractor || "-"),
+                assigned: job.assigned === "Unassigned" ? "-" : (job.assigned || "-"),
+                status: job.status || "Needs Survey"
+            };
+
+            if (existingJob) {
+                Object.assign(existingJob, nextValues);
+            } else {
+                const nextId = scopeJobs.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+                scopeJobs.unshift({
+                    id: nextId,
+                    ...nextValues
+                });
+            }
+
+            rerenderScopePage();
+            return true;
+        },
+        removeJobByAddress: (address) => {
+            const jobIndex = scopeJobs.findIndex((job) => job.address === address);
+            if (jobIndex === -1) {
+                return false;
+            }
+
+            scopeJobs.splice(jobIndex, 1);
+            if (state.selectedJobId && !scopeJobs.some((job) => job.id === state.selectedJobId)) {
+                state.selectedJobId = null;
+            }
+            rerenderScopePage();
+            return true;
+        },
         openJob: (jobId) => {
             state.selectedJobId = Number(jobId);
             rerenderScopePage();

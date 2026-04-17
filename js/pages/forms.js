@@ -1,5 +1,7 @@
 window.pageModules = window.pageModules || {};
 
+let activeSignaturePad = null;
+
 window.pageModules.forms = (() => {
     const FIELD_TYPES = [
         { type: "text", label: "T Text input", shortLabel: "text", defaultName: "Text input" },
@@ -66,8 +68,6 @@ window.pageModules.forms = (() => {
             signatureDataUrls: {}
         }
     };
-
-    let activeSignaturePad = null;
 
     function getFieldConfig(type) {
         return FIELD_TYPES.find((field) => field.type === type) || FIELD_TYPES[0];
