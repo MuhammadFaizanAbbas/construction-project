@@ -104,7 +104,18 @@ window.renderSidebar = function renderSidebar(activeId) {
         return;
     }
 
-    nav.innerHTML = window.sidebarItems.map((item) => {
+    const currentRole = typeof window.__jobManagementGetCurrentUserRole === "function"
+        ? window.__jobManagementGetCurrentUserRole()
+        : "";
+    const visibleItems = window.sidebarItems.filter((item) => {
+        if (currentRole === "office" && item.id === "access") {
+            return false;
+        }
+
+        return true;
+    });
+
+    nav.innerHTML = visibleItems.map((item) => {
         const isActive = item.id === activeId;
         const badge = item.badge !== undefined
             ? `<span class="nav-item__badge">${item.badge}</span>`

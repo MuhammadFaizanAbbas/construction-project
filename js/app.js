@@ -94,6 +94,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function getCurrentUserRole() {
+        return String(getStoredSession()?.role || "").trim().toLowerCase();
+    }
+
+    function userHasPageAccess(pageId) {
+        const role = getCurrentUserRole();
+
+        if (role === "office" && pageId === "access") {
+            return false;
+        }
+
+        return true;
+    }
+
     function updateSidebarUser(user) {
         const fallbackName = user?.name || "Guest User";
         const fallbackEmail = user?.email || "Not signed in";
@@ -361,7 +375,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function navigateToPage(pageId, options = {}) {
         const { replace = false } = options;
-        setActivePage(pageId);
+        const nextPageId = userHasPageAccess(pageId) ? pageId : "dashboard";
+        setActivePage(nextPageId);
         syncUrlWithPage(activePage, replace);
         if (!AUTH_PAGES.has(activePage)) {
             window.renderSidebar(activePage);
@@ -455,6 +470,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.__jobManagementRenderActivePage = () => renderPage(activePage);
     window.__jobManagementNavigateToPage = navigateToPage;
     window.__jobManagementShowToast = showToast;
+    window.__jobManagementGetStoredSession = getStoredSession;
+    window.__jobManagementGetCurrentUserRole = getCurrentUserRole;
+    window.__jobManagementUserHasPageAccess = userHasPageAccess;
     window.__jobManagementAuth = {
         login: async (payload) => {
             if (hasSupabaseAuthConfig()) {
@@ -493,6 +511,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!hasAuthenticatedSession() && !AUTH_PAGES.has(activePage)) {
         navigateToPage("login", { replace: true });
     } else if (hasAuthenticatedSession() && AUTH_PAGES.has(activePage)) {
+        navigateToPage("dashboard", { replace: true });
+    } else if (hasAuthenticatedSession() && !AUTH_PAGES.has(activePage) && !userHasPageAccess(activePage)) {
         navigateToPage("dashboard", { replace: true });
     } else if ((USE_HASH_ROUTING && !window.location.hash) || (!USE_HASH_ROUTING && window.location.pathname === "/")) {
         navigateToPage("login", { replace: true });
@@ -618,6 +638,10 @@ document.addEventListener("DOMContentLoaded", () => {
             navigateToPage("dashboard", { replace: true });
             return;
         }
+        if (hasAuthenticatedSession() && !AUTH_PAGES.has(pageId) && !userHasPageAccess(pageId)) {
+            navigateToPage("dashboard", { replace: true });
+            return;
+        }
         setActivePage(pageId);
         if (!AUTH_PAGES.has(pageId)) {
             window.renderSidebar(pageId);
@@ -636,6 +660,10 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         if (hasAuthenticatedSession() && AUTH_PAGES.has(pageId)) {
+            navigateToPage("dashboard", { replace: true });
+            return;
+        }
+        if (hasAuthenticatedSession() && !AUTH_PAGES.has(pageId) && !userHasPageAccess(pageId)) {
             navigateToPage("dashboard", { replace: true });
             return;
         }

@@ -92,6 +92,14 @@ window.pageModules.dashboard = (() => {
         }
     }
 
+    function canDeleteJobs() {
+        const currentRole = typeof window.__jobManagementGetCurrentUserRole === "function"
+            ? window.__jobManagementGetCurrentUserRole()
+            : "";
+
+        return currentRole !== "office";
+    }
+
     function escapeAttribute(value) {
         return String(value)
             .replace(/&/g, "&amp;")
@@ -1440,6 +1448,7 @@ window.pageModules.dashboard = (() => {
             const filteredJobs = getFilteredJobs();
             const totalPages = Math.max(1, Math.ceil(filteredJobs.length / state.perPage));
             state.currentPage = Math.min(state.currentPage, totalPages);
+            const showDeleteAction = canDeleteJobs();
 
             const startIndex = (state.currentPage - 1) * state.perPage;
             const visibleJobs = filteredJobs.slice(startIndex, startIndex + state.perPage);
@@ -1506,9 +1515,11 @@ window.pageModules.dashboard = (() => {
                                                     <button class="table-action table-action--edit" type="button" data-edit-job="${job.id}" aria-label="Edit ${job.address}">
                                                         <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4z"></path></svg>
                                                     </button>
-                                                    <button class="table-action table-action--delete" type="button" data-delete-job="${job.id}" aria-label="Delete ${job.address}">
-                                                        <svg viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
-                                                    </button>
+                                                    ${showDeleteAction ? `
+                                                        <button class="table-action table-action--delete" type="button" data-delete-job="${job.id}" aria-label="Delete ${job.address}">
+                                                            <svg viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                                                        </button>
+                                                    ` : ""}
                                                 </div>
                                             </td>
                                         </tr>
@@ -1680,6 +1691,10 @@ window.pageModules.dashboard = (() => {
             }
 
             if (deleteButton) {
+                if (!canDeleteJobs()) {
+                    return true;
+                }
+
                 const jobId = Number(deleteButton.getAttribute("data-delete-job"));
                 const jobIndex = dashboardJobs.findIndex((job) => job.id === jobId);
 
