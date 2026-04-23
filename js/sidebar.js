@@ -13,6 +13,27 @@ window.sidebarItems = [
     { id: "access", label: "Users & Access", icon: "key" }
 ];
 
+window.getSidebarItemsForRole = function getSidebarItemsForRole(role) {
+    const normalizedRole = String(role || "").trim().toLowerCase();
+
+    if (normalizedRole === "contractor") {
+        return [
+            { id: "dashboard", label: "My Jobs", icon: "layout" },
+            { id: "schedule", label: "Schedule", icon: "calendar" },
+            { id: "scope", label: "Scope of Works", icon: "file" },
+            { id: "archive", label: "Billed Jobs", icon: "archive" }
+        ];
+    }
+
+    return window.sidebarItems.filter((item) => {
+        if (normalizedRole === "office" && item.id === "access") {
+            return false;
+        }
+
+        return true;
+    });
+};
+
 window.sidebarIcons = {
     layout: `
         <svg viewBox="0 0 24 24">
@@ -107,13 +128,9 @@ window.renderSidebar = function renderSidebar(activeId) {
     const currentRole = typeof window.__jobManagementGetCurrentUserRole === "function"
         ? window.__jobManagementGetCurrentUserRole()
         : "";
-    const visibleItems = window.sidebarItems.filter((item) => {
-        if (currentRole === "office" && item.id === "access") {
-            return false;
-        }
-
-        return true;
-    });
+    const visibleItems = typeof window.getSidebarItemsForRole === "function"
+        ? window.getSidebarItemsForRole(currentRole)
+        : window.sidebarItems;
 
     nav.innerHTML = visibleItems.map((item) => {
         const isActive = item.id === activeId;

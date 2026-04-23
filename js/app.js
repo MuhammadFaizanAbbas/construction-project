@@ -21,15 +21,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const appShell = document.querySelector(".app-shell");
     const ACTIVE_PAGE_STORAGE_KEY = "job-management-active-page";
     const AUTH_SESSION_STORAGE_KEY = "job-management-auth-session";
+    const LOCAL_AUTH_USERS_STORAGE_KEY = "job-management-local-auth-users";
     const USE_HASH_ROUTING = window.location.port === "5501";
-    const API_BASE_URL = window.location.port === "5501"
-        ? "http://127.0.0.1:8000"
-        : "";
+    const API_BASE_URL = String(window.__JOB_MANAGEMENT_API_BASE_URL__ || "").trim().replace(/\/+$/, "");
     const SUPABASE_AUTH_CONFIG = window.__SUPABASE_AUTH_CONFIG__ || {};
     const toastStack = document.getElementById("toastStack");
     let pageStyleTag = document.getElementById("pageStyleTag");
     let activePage = "login";
     const AUTH_PAGES = new Set(["login", "signup"]);
+    const DEFAULT_LOCAL_AUTH_USER = {
+        id: "local-demo-admin",
+        name: "Demo Admin",
+        email: "admin@cejconstruction.com",
+        password: "admin123",
+        role: "admin"
+    };
     const notifications = [
         {
             title: "Complete but not billed",
@@ -100,12 +106,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function userHasPageAccess(pageId) {
         const role = getCurrentUserRole();
+        const allowedPageIds = typeof window.getSidebarItemsForRole === "function"
+            ? window.getSidebarItemsForRole(role).map((item) => item.id)
+            : (window.sidebarItems || []).map((item) => item.id);
 
-        if (role === "office" && pageId === "access") {
-            return false;
+        if (AUTH_PAGES.has(pageId)) {
+            return true;
         }
 
-        return true;
+        return allowedPageIds.includes(pageId);
     }
 
     function updateSidebarUser(user) {
@@ -166,6 +175,18 @@ document.addEventListener("DOMContentLoaded", () => {
         return Boolean(url && publishableKey);
     }
 
+    function getAuthMode() {
+        if (hasSupabaseAuthConfig()) {
+            return "supabase";
+        }
+
+        if (API_BASE_URL) {
+            return "api";
+        }
+
+        return "local";
+    }
+
     function createAppUserFromSupabase(user) {
         const metadata = user?.user_metadata || {};
         const appMetadata = user?.app_metadata || {};
@@ -178,6 +199,99 @@ document.addEventListener("DOMContentLoaded", () => {
             name: metadata.name || metadata.full_name || appMetadata.name || fallbackName,
             role: metadata.role || appMetadata.role || "Team Member"
         };
+    }
+
+    function getLocalAuthUsers() {
+        try {
+            const rawValue = localStorage.getItem(LOCAL_AUTH_USERS_STORAGE_KEY);
+            const parsedValue = rawValue ? JSON.parse(rawValue) : [];
+            return Array.isArray(parsedValue) ? parsedValue : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function setLocalAuthUsers(users) {
+        localStorage.setItem(LOCAL_AUTH_USERS_STORAGE_KEY, JSON.stringify(users));
+    }
+
+    function ensureLocalAuthBootstrap() {
+        if (getAuthMode() !== "local") {
+            return;
+        }
+
+        const users = getLocalAuthUsers();
+
+        if (users.length > 0) {
+            return;
+        }
+
+        setLocalAuthUsers([DEFAULT_LOCAL_AUTH_USER]);
+    }
+
+    function createLocalAppUser(user) {
+        const fallbackName = user?.email ? String(user.email).split("@")[0] : "User";
+
+        return {
+            id: user?.id || `local-${Date.now()}`,
+            email: user?.email || "Not signed in",
+            name: user?.name || fallbackName,
+            role: user?.role || "Team Member"
+        };
+    }
+
+    function isNetworkAuthError(error) {
+        const message = String(error?.message || "").toLowerCase();
+        return !message
+            || message.includes("failed to fetch")
+            || message.includes("networkerror")
+            || message.includes("network error")
+            || message.includes("load failed")
+            || message.includes("connection refused")
+            || message.includes("err_connection_refused")
+            || message.includes("fetch failed");
+    }
+
+    function signUpLocally(payload) {
+        const users = getLocalAuthUsers();
+        const normalizedEmail = String(payload.email || "").trim().toLowerCase();
+        const existingUser = users.find((user) => String(user.email || "").trim().toLowerCase() === normalizedEmail);
+
+        if (existingUser) {
+            throw new Error("An account with this email already exists.");
+        }
+
+        const nextUser = {
+            id: `local-${Date.now()}`,
+            name: payload.name,
+            email: normalizedEmail,
+            password: payload.password,
+            role: payload.role
+        };
+
+        users.push(nextUser);
+        setLocalAuthUsers(users);
+
+        const appUser = createLocalAppUser(nextUser);
+        setStoredSession(appUser);
+        return { user: appUser, requiresEmailConfirmation: false };
+    }
+
+    function signInLocally(payload) {
+        const users = getLocalAuthUsers();
+        const normalizedEmail = String(payload.email || "").trim().toLowerCase();
+        const existingUser = users.find((user) => (
+            String(user.email || "").trim().toLowerCase() === normalizedEmail
+            && String(user.password || "") === String(payload.password || "")
+        ));
+
+        if (!existingUser) {
+            throw new Error("Invalid email or password.");
+        }
+
+        const appUser = createLocalAppUser(existingUser);
+        setStoredSession(appUser);
+        return { user: appUser, session: null };
     }
 
     async function postSupabaseAuth(path, payload) {
@@ -442,14 +556,17 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const resolvedTitle = typeof page.title === "function" ? page.title() : page.title;
+        const resolvedSearch = typeof page.search === "function" ? page.search() : page.search;
+
         updateLayoutForPage(pageId);
 
         if (contentHeaderTitle) {
-            contentHeaderTitle.textContent = page.title;
+            contentHeaderTitle.textContent = resolvedTitle;
         }
 
         if (searchInput) {
-            searchInput.placeholder = page.search || "Search...";
+            searchInput.placeholder = resolvedSearch || "Search...";
         }
 
         applyPageStyle(page.style);
@@ -461,7 +578,7 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             : `
                 <section class="page-welcome">
-                    <h3>Welcome to ${escapeHtml(page.title)}</h3>
+                    <h3>Welcome to ${escapeHtml(resolvedTitle)}</h3>
                     <p>This page is ready.</p>
                 </section>
             `;
@@ -473,6 +590,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.__jobManagementGetStoredSession = getStoredSession;
     window.__jobManagementGetCurrentUserRole = getCurrentUserRole;
     window.__jobManagementUserHasPageAccess = userHasPageAccess;
+    window.__jobManagementGetAuthMode = getAuthMode;
+    window.__jobManagementGetDefaultLocalCredentials = () => ({
+        email: DEFAULT_LOCAL_AUTH_USER.email,
+        password: DEFAULT_LOCAL_AUTH_USER.password
+    });
     window.__jobManagementAuth = {
         login: async (payload) => {
             if (hasSupabaseAuthConfig()) {
@@ -481,12 +603,19 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (API_BASE_URL) {
-                const result = await postJson("/api/login", payload);
-                setStoredSession(result.user);
-                return result.user;
+                try {
+                    const result = await postJson("/api/login", payload);
+                    setStoredSession(result.user);
+                    return result.user;
+                } catch (error) {
+                    if (!isNetworkAuthError(error)) {
+                        throw error;
+                    }
+                }
             }
 
-            throw new Error("Supabase auth is not configured. Add your project URL and anon/publishable key to js/supabase-config.js.");
+            const result = signInLocally(payload);
+            return result.user;
         },
         signup: async (payload) => {
             if (hasSupabaseAuthConfig()) {
@@ -494,17 +623,24 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (API_BASE_URL) {
-                const result = await postJson("/api/signup", payload);
-                setStoredSession(result.user);
-                return { user: result.user, requiresEmailConfirmation: false };
+                try {
+                    const result = await postJson("/api/signup", payload);
+                    setStoredSession(result.user);
+                    return { user: result.user, requiresEmailConfirmation: false };
+                } catch (error) {
+                    if (!isNetworkAuthError(error)) {
+                        throw error;
+                    }
+                }
             }
 
-            throw new Error("Supabase auth is not configured. Add your project URL and anon/publishable key to js/supabase-config.js.");
+            return signUpLocally(payload);
         },
         logout: () => {
             clearStoredSession();
         }
     };
+    ensureLocalAuthBootstrap();
     updateSidebarUser(getStoredSession());
     activePage = getPageIdFromLocation();
 
@@ -556,6 +692,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     pageContent?.addEventListener("change", (event) => {
+        const page = getPage(activePage);
+
+        if (typeof page?.onChange === "function") {
+            page.onChange(event, {
+                escapeHtml,
+                rerender: () => renderPage(activePage)
+            });
+        }
+    });
+
+    pageContent?.addEventListener("submit", (event) => {
+        const page = getPage(activePage);
+
+        if (typeof page?.onSubmit === "function") {
+            const handled = page.onSubmit(event, {
+                escapeHtml,
+                rerender: () => renderPage(activePage)
+            });
+
+            if (handled) {
+                event.preventDefault();
+            }
+        }
+    });
+
+    pageContent?.addEventListener("input", (event) => {
         const page = getPage(activePage);
 
         if (typeof page?.onChange === "function") {

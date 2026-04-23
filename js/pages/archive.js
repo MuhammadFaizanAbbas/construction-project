@@ -1,8 +1,13 @@
 window.pageModules = window.pageModules || {};
 
+function isArchiveContractorRole() {
+    return typeof window.__jobManagementGetCurrentUserRole === "function"
+        && window.__jobManagementGetCurrentUserRole() === "contractor";
+}
+
 window.pageModules.archive = {
-    title: "Archive",
-    search: "Search archive...",
+    title: () => isArchiveContractorRole() ? "Billed Jobs" : "Archive",
+    search: () => isArchiveContractorRole() ? "Search billed jobs..." : "Search archive...",
     style: `
         .archive-page {
             display: flex;
@@ -94,9 +99,9 @@ window.pageModules.archive = {
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4.2l1.4 1.8H18.5A2.5 2.5 0 0 1 21 9.3v7.2A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path>
                     </svg>
-                    <span>Archive</span>
+                    <span>${isArchiveContractorRole() ? "Billed Jobs" : "Archive"}</span>
                 </h2>
-                <p class="archive-page__meta">0 archived jobs · Total value £0</p>
+                <p class="archive-page__meta">${isArchiveContractorRole() ? "0 billed jobs - Total value GBP 0" : "0 archived jobs - Total value GBP 0"}</p>
             </div>
             <section class="archive-empty">
                 <div class="archive-empty__inner">
@@ -106,8 +111,8 @@ window.pageModules.archive = {
                             <path d="M17.7 13.2c.6-.1 1.2.4 1.2 1 0 .4-.2.7-.5.9l-2.6 2.2a1 1 0 0 1-1.6-.8v-1.2h-1.1a1 1 0 1 1 0-2h1.1v-1.2a1 1 0 0 1 1.6-.8z"></path>
                         </svg>
                     </div>
-                    <h3>Archive is empty</h3>
-                    <p>Jobs marked as billed will appear here, grouped by client.</p>
+                    <h3>${isArchiveContractorRole() ? "No billed jobs yet" : "Archive is empty"}</h3>
+                    <p>${isArchiveContractorRole() ? "Jobs marked as billed will appear here for the contractor view." : "Jobs marked as billed will appear here, grouped by client."}</p>
                 </div>
             </section>
         </section>

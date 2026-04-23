@@ -304,13 +304,6 @@ window.pageModules.signup = (() => {
                                 ${state.errors.email ? `<div class="signup-form__error">${escapeHtml(state.errors.email)}</div>` : ""}
                             </div>
                             <div class="signup-form__field">
-                                <label for="signupRole">Role</label>
-                                <select id="signupRole" data-signup-role class="${state.errors.role ? "is-invalid" : ""}">
-                                    ${roles.map((role) => `<option value="${role}" ${state.role === role ? "selected" : ""}>${role}</option>`).join("")}
-                                </select>
-                                ${state.errors.role ? `<div class="signup-form__error">${escapeHtml(state.errors.role)}</div>` : ""}
-                            </div>
-                            <div class="signup-form__field">
                                 <label for="signupPassword">Password</label>
                                 <div class="signup-form__password-wrap">
                                     <input id="signupPassword" data-signup-password type="${state.showPassword ? "text" : "password"}" placeholder="Create password" value="${escapeHtml(state.password)}" class="${state.errors.password ? "is-invalid" : ""}">
@@ -324,6 +317,13 @@ window.pageModules.signup = (() => {
                                     </button>
                                 </div>
                                 ${state.errors.password ? `<div class="signup-form__error">${escapeHtml(state.errors.password)}</div>` : ""}
+                            </div>
+                            <div class="signup-form__field">
+                                <label for="signupRole">Role</label>
+                                <select id="signupRole" data-signup-role class="${state.errors.role ? "is-invalid" : ""}">
+                                    ${roles.map((role) => `<option value="${role}" ${state.role === role ? "selected" : ""}>${role}</option>`).join("")}
+                                </select>
+                                ${state.errors.role ? `<div class="signup-form__error">${escapeHtml(state.errors.role)}</div>` : ""}
                             </div>
                             <button class="signup-form__submit" data-signup-submit type="button" ${state.isSubmitting ? "disabled" : ""}>${state.isSubmitting ? "Creating..." : "Create account"}</button>
                             <p class="signup-form__footer">Already have an account? <a href="/#login" data-auth-route="login">Login</a></p>

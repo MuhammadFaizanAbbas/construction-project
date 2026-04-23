@@ -65,18 +65,19 @@ window.pageModules.dashboard = (() => {
     ];
     const SCOPE_UNIT_OPTIONS = ["SM", "LM", "NO", "IT", "HR", "---"];
     const dashboardJobs = [
-        { id: 1, address: "42 Dorac Avenue SK8 3NZ", client: "MSV", tenant: "Mrs Grice", type: "Disrepair", contractor: "B&G Contractors", assigned: "Harmony", status: "Complete", start: "16/03/2026", pipeline: 3200 },
-        { id: 2, address: "14 Birchwood Close M22 4PR", client: "MSV", tenant: "Mr & Mrs Patel", type: "Disrepair", contractor: "B&G Contractors", assigned: "John Nelson", status: "In Progress", start: "07/04/2026", pipeline: 2850 },
-        { id: 3, address: "7 Maple Street SK1 2EF", client: "Wythenshawe Community", tenant: "Ms Thompson", type: "Planned Works", contractor: "B&G Contractors", assigned: "Harmony", status: "In Progress", start: "08/04/2026", pipeline: 4100 },
-        { id: 4, address: "33 Oak Lane WA15 9GH", client: "MSV", tenant: "Mr Yusuf", type: "Disrepair", contractor: "B&G Contractors", assigned: "Unassigned", status: "Needs Survey", start: "-", pipeline: 1500 },
-        { id: 5, address: "55 Cedar Avenue SK4 1LM", client: "MSV", tenant: "Mr Singh", type: "Planned Works", contractor: "B&G Contractors", assigned: "Dave", status: "Quoted", start: "14/04/2026", pipeline: 3700 },
-        { id: 6, address: "8 Willow Court M20 6NP", client: "Wythenshawe Community", tenant: "Mrs Davies", type: "Disrepair", contractor: "B&G Contractors", assigned: "Harmony", status: "Complete", start: "24/03/2026", pipeline: 4600 },
-        { id: 7, address: "91 Ashton Road M14 5TL", client: "MSV", tenant: "Mr Khan", type: "Disrepair", contractor: "Contractor Review", assigned: "Pending", status: "Contractor Review", start: "18/04/2026", pipeline: 2150 },
-        { id: 8, address: "12 Fairway Drive SK5 9TR", client: "MSV", tenant: "Mrs Begum", type: "Disrepair", contractor: "B&G Contractors", assigned: "Unassigned", status: "Needs Snagging", start: "21/04/2026", pipeline: 2400 }
+        { id: 1, address: "42 Dorac Avenue SK8 3NZ", client: "MSV", tenant: "Mrs Grice", type: "Disrepair", contractor: "B&G Contractors", assigned: "Harmony", status: "Complete", start: "16/03/2026", pipeline: 3200, jobPrice: 1850 },
+        { id: 2, address: "14 Birchwood Close M22 4PR", client: "MSV", tenant: "Mr & Mrs Patel", type: "Disrepair", contractor: "B&G Contractors", assigned: "John Nelson", status: "In Progress", start: "07/04/2026", pipeline: 2850, jobPrice: 920 },
+        { id: 3, address: "7 Maple Street SK1 2EF", client: "Wythenshawe Community", tenant: "Ms Thompson", type: "Planned Works", contractor: "B&G Contractors", assigned: "Harmony", status: "In Progress", start: "08/04/2026", pipeline: 4100, jobPrice: 2100 },
+        { id: 4, address: "33 Oak Lane WA15 9GH", client: "MSV", tenant: "Mr Yusuf", type: "Disrepair", contractor: "B&G Contractors", assigned: "Unassigned", status: "Needs Survey", start: "-", pipeline: 1500, jobPrice: 0 },
+        { id: 5, address: "55 Cedar Avenue SK4 1LM", client: "MSV", tenant: "Mr Singh", type: "Planned Works", contractor: "B&G Contractors", assigned: "Dave", status: "Quoted", start: "14/04/2026", pipeline: 3700, jobPrice: 3400 },
+        { id: 6, address: "8 Willow Court M20 6NP", client: "Wythenshawe Community", tenant: "Mrs Davies", type: "Disrepair", contractor: "B&G Contractors", assigned: "Harmony", status: "Billed", start: "24/03/2026", pipeline: 4600, jobPrice: 760 },
+        { id: 7, address: "91 Ashton Road M14 5TL", client: "MSV", tenant: "Mr Khan", type: "Disrepair", contractor: "Contractor Review", assigned: "Pending", status: "Contractor Review", start: "18/04/2026", pipeline: 2150, jobPrice: 650 },
+        { id: 8, address: "22 Birch Grove WA16 7QT", client: "MSV", tenant: "Mr Brennan", type: "Disrepair", contractor: "B&G Contractors", assigned: "John Nelson", status: "Needs Snagging", start: "21/04/2026", pipeline: 2400, jobPrice: 1100 }
     ];
 
     const state = {
         filter: "all",
+        searchTerm: "",
         currentPage: 1,
         perPage: 10,
         selectedJobId: null,
@@ -90,6 +91,11 @@ window.pageModules.dashboard = (() => {
         if (typeof window.__jobManagementRenderActivePage === "function") {
             window.__jobManagementRenderActivePage();
         }
+    }
+
+    function isContractorRole() {
+        return typeof window.__jobManagementGetCurrentUserRole === "function"
+            && window.__jobManagementGetCurrentUserRole() === "contractor";
     }
 
     function canDeleteJobs() {
@@ -109,6 +115,18 @@ window.pageModules.dashboard = (() => {
     }
 
     function getDashboardFilters() {
+        if (isContractorRole()) {
+            return [
+                { id: "all", label: "All jobs" },
+                { id: "in progress", label: "In Progress" },
+                { id: "needs snagging", label: "Needs Snagging" },
+                { id: "contractor review", label: "My Review" },
+                { id: "complete", label: "Complete" },
+                { id: "needs survey", label: "Needs Survey" },
+                { id: "billed", label: "Billed" }
+            ];
+        }
+
         return [
             { id: "all", label: "All" },
             { id: "needs survey", label: "Needs Survey" },
@@ -120,12 +138,159 @@ window.pageModules.dashboard = (() => {
         ];
     }
 
-    function getFilteredJobs() {
-        if (state.filter === "all") {
-            return dashboardJobs;
+    function getVisibleDashboardJobs() {
+        const searchableFields = ["address", "tenant", "client", "assigned"];
+        const normalizedSearch = state.searchTerm.trim().toLowerCase();
+        const roleScopedJobs = isContractorRole()
+            ? dashboardJobs.filter((job) => job.contractor === "B&G Contractors")
+            : dashboardJobs;
+
+        if (!normalizedSearch) {
+            return roleScopedJobs;
         }
 
-        return dashboardJobs.filter((job) => job.status.toLowerCase() === state.filter);
+        return roleScopedJobs.filter((job) => searchableFields.some((field) => (
+            String(job[field] || "").toLowerCase().includes(normalizedSearch)
+        )));
+    }
+
+    function getFilteredJobs() {
+        const visibleJobs = getVisibleDashboardJobs();
+
+        if (state.filter === "all") {
+            return visibleJobs;
+        }
+
+        return visibleJobs.filter((job) => job.status.toLowerCase() === state.filter);
+    }
+
+    function formatCurrency(value) {
+        return `GBP ${Number(value || 0).toLocaleString("en-GB")}`;
+    }
+
+    function renderContractorDashboard(filteredJobs) {
+        const contractorJobs = getVisibleDashboardJobs();
+        const totalPages = Math.max(1, Math.ceil(filteredJobs.length / state.perPage));
+        state.currentPage = Math.min(state.currentPage, totalPages);
+
+        const startIndex = (state.currentPage - 1) * state.perPage;
+        const visibleJobs = filteredJobs.slice(startIndex, startIndex + state.perPage);
+        const selectedJob = dashboardJobs.find((job) => job.id === state.selectedJobId);
+        const totalJobPrice = contractorJobs.reduce((sum, job) => sum + Number(job.jobPrice || 0), 0);
+        const paidAndSigned = contractorJobs
+            .filter((job) => job.status === "Billed")
+            .reduce((sum, job) => sum + Number(job.jobPrice || 0), 0);
+        const awaitingPayment = contractorJobs
+            .filter((job) => job.status === "Complete")
+            .reduce((sum, job) => sum + Number(job.jobPrice || 0), 0);
+        const summaryCards = [
+            { label: "My jobs", value: contractorJobs.length, tone: "neutral" },
+            { label: "In progress", value: contractorJobs.filter((job) => job.status === "In Progress").length, tone: "green" },
+            { label: "Snagging", value: contractorJobs.filter((job) => job.status === "Needs Snagging").length, tone: "amber", accent: true },
+            { label: "Complete", value: contractorJobs.filter((job) => job.status === "Complete").length, tone: "green" },
+            { label: "Billed & signed", value: contractorJobs.filter((job) => job.status === "Billed").length, tone: "purple" }
+        ];
+        const filters = getDashboardFilters();
+
+        return `
+            <section class="dashboard-shell dashboard-shell--contractor">
+                <div class="contractor-page-heading">
+                    <h2>My Jobs</h2>
+                    <p>Jobs issued to you by CEJ Construction office</p>
+                </div>
+
+                <div class="contractor-summary-grid">
+                    ${summaryCards.map((item) => `
+                        <article class="contractor-summary-card${item.accent ? " contractor-summary-card--accent" : ""}">
+                            <p>${item.label}</p>
+                            <strong class="tone-${item.tone}">${item.value}</strong>
+                        </article>
+                    `).join("")}
+                </div>
+
+                <div class="contractor-payment-grid">
+                    <article class="contractor-payment-card contractor-payment-card--primary">
+                        <span>Total job price value</span>
+                        <strong>${formatCurrency(totalJobPrice)}</strong>
+                        <p>Across all ${contractorJobs.length} issued jobs</p>
+                    </article>
+                    <article class="contractor-payment-card contractor-payment-card--secondary">
+                        <span>Paid & signed</span>
+                        <strong>${formatCurrency(paidAndSigned)}</strong>
+                    </article>
+                    <article class="contractor-payment-card contractor-payment-card--warning">
+                        <span>Awaiting payment</span>
+                        <strong>${formatCurrency(awaitingPayment)}</strong>
+                    </article>
+                </div>
+
+                <div class="contractor-price-note">
+                    <strong>Job price</strong> is the value CEJ Construction has allocated to you for each job. This is the amount payable to your company upon satisfactory completion and sign-off.
+                </div>
+
+                <label class="contractor-search" aria-label="Search my jobs">
+                    <input type="search" data-dashboard-search placeholder="Search address, tenant, client..." value="${escapeAttribute(state.searchTerm)}">
+                </label>
+
+                <div class="dashboard-filters dashboard-filters--contractor">
+                    ${filters.map((filter) => `
+                        <button class="dashboard-filter${state.filter === filter.id ? " is-active" : ""}" type="button" data-dashboard-filter="${filter.id}">
+                            ${filter.label}
+                        </button>
+                    `).join("")}
+                </div>
+
+                <div class="jobs-table-card jobs-table-card--contractor">
+                    <div class="jobs-table-wrap">
+                        <table class="jobs-table jobs-table--contractor">
+                            <thead>
+                                <tr>
+                                    <th>Address</th>
+                                    <th>Client</th>
+                                    <th>Type</th>
+                                    <th>Assigned Operative</th>
+                                    <th>Job Price</th>
+                                    <th>Status</th>
+                                    <th>Start</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${visibleJobs.map((job) => `
+                                    <tr>
+                                        <td class="jobs-table__address">${job.address}</td>
+                                        <td>${job.client}</td>
+                                        <td><span class="${getTypeClass(job.type)}">${job.type}</span></td>
+                                        <td>${job.assigned}</td>
+                                        <td class="jobs-table__price">${formatCurrency(job.jobPrice)}</td>
+                                        <td><span class="${getStatusClass(job.status)}">${job.status}</span></td>
+                                        <td>${job.start}</td>
+                                        <td>
+                                            <div class="jobs-table__actions jobs-table__actions--contractor">
+                                                <button class="contractor-table-action contractor-table-action--view" type="button" data-edit-job="${job.id}">View</button>
+                                                <button class="contractor-table-action contractor-table-action--assign" type="button" data-assign-job="${job.id}">Assign</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="table-pagination">
+                    <p>Showing ${filteredJobs.length ? startIndex + 1 : 0}-${Math.min(startIndex + state.perPage, filteredJobs.length)} of ${filteredJobs.length} jobs</p>
+                    <div class="table-pagination__actions">
+                        <button class="pagination-button" type="button" data-page-nav="prev" ${state.currentPage === 1 ? "disabled" : ""}>Prev</button>
+                        ${Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => `
+                            <button class="pagination-button${state.currentPage === page ? " is-active" : ""}" type="button" data-page-number="${page}">${page}</button>
+                        `).join("")}
+                        <button class="pagination-button" type="button" data-page-nav="next" ${state.currentPage === totalPages ? "disabled" : ""}>Next</button>
+                    </div>
+                </div>
+            </section>
+            ${renderModal(selectedJob)}
+        `;
     }
 
     function getStatusClass(status) {
@@ -620,8 +785,8 @@ window.pageModules.dashboard = (() => {
     }
 
     return {
-        title: "Dashboard",
-        search: "Search dashboard...",
+        title: () => isContractorRole() ? "My Jobs" : "Dashboard",
+        search: () => isContractorRole() ? "Search my jobs..." : "Search dashboard...",
         style: `
             .dashboard-shell {
                 display: flex;
@@ -696,6 +861,187 @@ window.pageModules.dashboard = (() => {
                 background: #1f1f1f;
                 border-color: #1f1f1f;
                 color: #ffffff;
+            }
+
+            .dashboard-filters--contractor {
+                gap: 14px;
+            }
+
+            .dashboard-shell--contractor {
+                display: grid;
+                gap: 20px;
+            }
+
+            .contractor-page-heading h2 {
+                margin: 0 0 4px;
+                color: #121a26;
+                font-size: 1.95rem;
+                font-weight: 800;
+            }
+
+            .contractor-page-heading p {
+                margin: 0;
+                color: #6d7686;
+                font-size: 1rem;
+            }
+
+            .contractor-summary-grid {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 14px;
+            }
+
+            .contractor-summary-card {
+                background: #ffffff;
+                border: 1px solid #eef1f5;
+                border-radius: 18px;
+                padding: 18px 18px 16px;
+                box-shadow: 0 10px 24px rgba(24, 36, 61, 0.04);
+            }
+
+            .contractor-summary-card--accent {
+                background: #fff5e6;
+                border-color: #f3c482;
+            }
+
+            .contractor-summary-card p {
+                margin: 0 0 8px;
+                color: #5f6e83;
+                font-size: 0.9rem;
+            }
+
+            .contractor-summary-card strong {
+                font-size: 2rem;
+                font-weight: 800;
+            }
+
+            .contractor-payment-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+                gap: 14px;
+            }
+
+            .contractor-payment-card {
+                border-radius: 18px;
+                padding: 18px 20px;
+                min-height: 124px;
+                border: 1px solid transparent;
+            }
+
+            .contractor-payment-card span {
+                display: block;
+                margin-bottom: 10px;
+                color: #0f4d99;
+                font-size: 1rem;
+                font-weight: 800;
+                text-transform: uppercase;
+            }
+
+            .contractor-payment-card strong {
+                display: block;
+                color: #0f4d99;
+                font-size: 2.5rem;
+                font-weight: 900;
+            }
+
+            .contractor-payment-card p {
+                margin: 6px 0 0;
+                color: #0f4d99;
+                font-size: 0.95rem;
+            }
+
+            .contractor-payment-card--primary,
+            .contractor-payment-card--secondary {
+                background: #deecfb;
+                border-color: #9ec6f7;
+            }
+
+            .contractor-payment-card--warning {
+                background: #fff2d9;
+                border-color: #f3ca80;
+            }
+
+            .contractor-payment-card--warning span,
+            .contractor-payment-card--warning strong,
+            .contractor-payment-card--warning p {
+                color: #8f5a00;
+            }
+
+            .contractor-price-note {
+                border-radius: 16px;
+                background: #ffffff;
+                border: 1px solid #f0f2f6;
+                box-shadow: 0 10px 24px rgba(24, 36, 61, 0.04);
+                padding: 18px 20px;
+                color: #5f6e83;
+                font-size: 0.98rem;
+                line-height: 1.65;
+            }
+
+            .contractor-price-note strong {
+                color: #465161;
+            }
+
+            .contractor-search input {
+                width: 100%;
+                min-height: 58px;
+                border: 1px solid #cfd8e3;
+                border-radius: 16px;
+                background: #ffffff;
+                padding: 0 18px;
+                color: #162033;
+                font: inherit;
+                font-size: 1rem;
+                outline: none;
+            }
+
+            .contractor-search input:focus {
+                border-color: #162033;
+            }
+
+            .jobs-table-card--contractor {
+                border-radius: 18px;
+                overflow: hidden;
+            }
+
+            .jobs-table--contractor {
+                min-width: 980px;
+            }
+
+            .jobs-table--contractor th {
+                font-size: 0.8rem;
+                letter-spacing: 0.03em;
+                text-transform: uppercase;
+            }
+
+            .jobs-table__price {
+                font-weight: 800;
+                color: #111827;
+            }
+
+            .jobs-table__actions--contractor {
+                gap: 10px;
+            }
+
+            .contractor-table-action {
+                min-width: 74px;
+                min-height: 44px;
+                border-radius: 12px;
+                font: inherit;
+                font-weight: 700;
+                cursor: pointer;
+            }
+
+            .contractor-table-action--view {
+                background: #ffffff;
+                border: 1px solid #cfd8e3;
+                color: #162033;
+            }
+
+            .contractor-table-action--assign {
+                background: #fff4e5;
+                border: 1px solid #f3c482;
+                color: #b16300;
             }
 
             .jobs-table-card {
@@ -1409,6 +1755,11 @@ window.pageModules.dashboard = (() => {
                     grid-template-columns: repeat(2, minmax(0, 1fr));
                 }
 
+                .contractor-summary-grid,
+                .contractor-payment-grid {
+                    grid-template-columns: 1fr 1fr;
+                }
+
                 .table-pagination {
                     flex-direction: column;
                     align-items: flex-start;
@@ -1442,10 +1793,21 @@ window.pageModules.dashboard = (() => {
                     grid-template-columns: 1fr;
                 }
             }
+
+            @media (max-width: 680px) {
+                .contractor-summary-grid,
+                .contractor-payment-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
         `,
         render: () => {
             const filters = getDashboardFilters();
             const filteredJobs = getFilteredJobs();
+            if (isContractorRole()) {
+                return renderContractorDashboard(filteredJobs);
+            }
+
             const totalPages = Math.max(1, Math.ceil(filteredJobs.length / state.perPage));
             state.currentPage = Math.min(state.currentPage, totalPages);
             const showDeleteAction = canDeleteJobs();
@@ -1548,6 +1910,7 @@ window.pageModules.dashboard = (() => {
             const pageButton = event.target.closest("[data-page-number]");
             const pageNavButton = event.target.closest("[data-page-nav]");
             const editButton = event.target.closest("[data-edit-job]");
+            const assignButton = event.target.closest("[data-assign-job]");
             const deleteButton = event.target.closest("[data-delete-job]");
             const closeEditButton = event.target.closest("[data-close-edit]");
             const addClientButton = event.target.closest("[data-add-client-input]");
@@ -1588,6 +1951,14 @@ window.pageModules.dashboard = (() => {
                 clearEditFormState();
                 state.isCreateModalOpen = false;
                 state.selectedJobId = Number(editButton.getAttribute("data-edit-job"));
+                rerender();
+                return true;
+            }
+
+            if (assignButton) {
+                clearEditFormState();
+                state.isCreateModalOpen = false;
+                state.selectedJobId = Number(assignButton.getAttribute("data-assign-job"));
                 rerender();
                 return true;
             }
@@ -1818,6 +2189,7 @@ window.pageModules.dashboard = (() => {
             return false;
         },
         onChange: (event, { rerender }) => {
+            const dashboardSearch = event.target.closest("[data-dashboard-search]");
             const clientSelect = event.target.closest("[data-edit-client-select]");
             const dateInput = event.target.closest("[data-edit-date-field]");
             const imageInput = event.target.closest("[data-image-upload-input]");
@@ -1827,6 +2199,13 @@ window.pageModules.dashboard = (() => {
             const scopeRowField = event.target.closest("[data-scope-row-field]");
             const editField = event.target.closest("[data-edit-field]");
             const templateField = event.target.closest("[data-template-field]");
+
+            if (dashboardSearch) {
+                state.searchTerm = dashboardSearch.value;
+                state.currentPage = 1;
+                rerender();
+                return true;
+            }
 
             if (dateInput && state.editForm) {
                 state.editForm[dateInput.getAttribute("data-edit-date-field")] = dateInput.value;
