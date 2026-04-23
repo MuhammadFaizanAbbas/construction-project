@@ -405,6 +405,8 @@ window.pageModules.signup = (() => {
                 return false;
             }
 
+            const shouldRerender = event.type !== "input";
+
             if (target.matches("[data-signup-name]")) {
                 state.name = target.value;
                 delete state.errors.name;
@@ -422,7 +424,9 @@ window.pageModules.signup = (() => {
             }
 
             state.successMessage = "";
-            rerenderSignupPage();
+            if (shouldRerender) {
+                rerenderSignupPage();
+            }
             return true;
         }
     };

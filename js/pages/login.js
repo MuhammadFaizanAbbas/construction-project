@@ -407,11 +407,15 @@ window.pageModules.login = (() => {
                 return false;
             }
 
+            const shouldRerender = event.type !== "input";
+
             if (changeTarget.matches("[data-login-email]")) {
                 state.email = changeTarget.value;
                 delete state.errors.email;
                 state.successMessage = "";
-                rerenderLoginPage();
+                if (shouldRerender) {
+                    rerenderLoginPage();
+                }
                 return true;
             }
 
@@ -419,7 +423,9 @@ window.pageModules.login = (() => {
                 state.password = changeTarget.value;
                 delete state.errors.password;
                 state.successMessage = "";
-                rerenderLoginPage();
+                if (shouldRerender) {
+                    rerenderLoginPage();
+                }
                 return true;
             }
 
