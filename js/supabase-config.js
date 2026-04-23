@@ -7,6 +7,7 @@
         || hostname.endsWith(".googleusercontent.com")
         || hostname.endsWith(".cloudfunctions.net")
     );
+    const isVercelHost = hostname.endsWith(".vercel.app");
 
     function getApiBaseUrl() {
         if (window.__JOB_MANAGEMENT_API_BASE_URL__) {
@@ -18,6 +19,10 @@
         }
 
         if (isGoogleCloudHost) {
+            return origin;
+        }
+
+        if (isVercelHost) {
             return origin;
         }
 

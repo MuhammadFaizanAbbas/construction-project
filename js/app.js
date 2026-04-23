@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const AUTH_SESSION_STORAGE_KEY = "job-management-auth-session";
     const LOCAL_AUTH_USERS_STORAGE_KEY = "job-management-local-auth-users";
     const USE_HASH_ROUTING = window.location.port === "5501";
+    const IS_LOCAL_HOST = ["localhost", "127.0.0.1"].includes(window.location.hostname);
     const API_BASE_URL = String(window.__JOB_MANAGEMENT_API_BASE_URL__ || "").trim().replace(/\/+$/, "");
     const SUPABASE_AUTH_CONFIG = window.__SUPABASE_AUTH_CONFIG__ || {};
     const toastStack = document.getElementById("toastStack");
@@ -184,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return "api";
         }
 
-        return "local";
+        return IS_LOCAL_HOST ? "local" : "unconfigured";
     }
 
     function createAppUserFromSupabase(user) {
@@ -614,6 +615,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
+            if (!IS_LOCAL_HOST) {
+                throw new Error("Auth is not configured for this deployment. Set a live API base URL or Supabase public config.");
+            }
+
             const result = signInLocally(payload);
             return result.user;
         },
@@ -632,6 +637,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         throw error;
                     }
                 }
+            }
+
+            if (!IS_LOCAL_HOST) {
+                throw new Error("Auth is not configured for this deployment. Set a live API base URL or Supabase public config.");
             }
 
             return signUpLocally(payload);
