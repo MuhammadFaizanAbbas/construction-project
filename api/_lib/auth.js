@@ -74,7 +74,17 @@ function getSupabaseConfig() {
     const serviceKey = String(process.env.SUPABASE_SERVICE_KEY || "").trim();
 
     if (!baseUrl || !serviceKey) {
-        throw new Error("Server is missing SUPABASE_URL or SUPABASE_SERVICE_KEY.");
+        const missingKeys = [];
+
+        if (!baseUrl) {
+            missingKeys.push("SUPABASE_URL");
+        }
+
+        if (!serviceKey) {
+            missingKeys.push("SUPABASE_SERVICE_KEY");
+        }
+
+        throw new Error(`Server is missing ${missingKeys.join(" and ")}.`);
     }
 
     return { baseUrl, serviceKey };
@@ -195,6 +205,7 @@ async function loginUser(payload) {
 module.exports = {
     createUser,
     createCorsHeaders,
+    getSupabaseConfig,
     handleOptions,
     loginUser,
     readJsonBody,

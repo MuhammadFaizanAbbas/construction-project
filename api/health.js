@@ -1,4 +1,4 @@
-const { handleOptions, sendJson } = require("./_lib/auth");
+const { getSupabaseConfig, handleOptions, sendJson } = require("./_lib/auth");
 
 module.exports = async (request, response) => {
     if (handleOptions(request, response)) {
@@ -10,5 +10,27 @@ module.exports = async (request, response) => {
         return;
     }
 
-    sendJson(response, 200, { ok: true });
+    let configStatus = {
+        hasSupabaseUrl: false,
+        hasSupabaseServiceKey: false
+    };
+
+    try {
+        getSupabaseConfig();
+        configStatus = {
+            hasSupabaseUrl: true,
+            hasSupabaseServiceKey: true
+        };
+    } catch (error) {
+        configStatus = {
+            hasSupabaseUrl: Boolean(String(process.env.SUPABASE_URL || "").trim()),
+            hasSupabaseServiceKey: Boolean(String(process.env.SUPABASE_SERVICE_KEY || "").trim())
+        };
+    }
+
+    sendJson(response, 200, {
+        ok: true,
+        environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
+        ...configStatus
+    });
 };
